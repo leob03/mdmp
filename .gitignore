@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Dependency and Dataset files
+/home/lbringer/workspace/motion-generative-predictions/t2m
+/home/lbringer/workspace/motion-generative-predictions/kit
+/home/lbringer/workspace/motion-generative-predictions/glove
+/home/lbringer/workspace/motion-generative-predictions/body_models/smpl
