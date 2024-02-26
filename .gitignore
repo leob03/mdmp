@@ -129,7 +129,75 @@ dmypy.json
 .pyre/
 
 # Dependency and Dataset files
-/home/lbringer/workspace/motion-generative-predictions/t2m
-/home/lbringer/workspace/motion-generative-predictions/kit
-/home/lbringer/workspace/motion-generative-predictions/glove
-/home/lbringer/workspace/motion-generative-predictions/body_models/smpl
+t2m
+kit
+glove
+smpl
+assets/actionrecognition/humanact12_gru.tar
+assets/actionrecognition/uestc_rot6d_stgcn.tar
+body_models/smpl/J_regressor_extra.npy
+body_models/smpl/kintree_table.pkl
+body_models/smpl/SMPL_NEUTRAL.pkl
+glove/our_vab_data.npy
+body_models/smpl/smplfaces.npy
+glove/our_vab_idx.pkl
+glove/our_vab_words.pkl
+# kit/Comp_v6_KLD005/opt.txt
+# kit/Comp_v6_KLD005/meta/mean.npy
+# t2m/text_mot_match/model/finest.tar
+# t2m/text_mot_match/eval/E065.txt
+# t2m/text_mot_match/eval/E060.txt
+# t2m/text_mot_match/eval/E055.txt
+# t2m/text_mot_match/eval/E050.txt
+# t2m/text_mot_match/eval/E045.txt
+# t2m/text_mot_match/eval/E040.txt
+# t2m/text_mot_match/eval/E035.txt
+# t2m/text_mot_match/eval/E030.txt
+# t2m/text_mot_match/eval/E025.txt
+# t2m/text_mot_match/eval/E020.txt
+# t2m/text_mot_match/eval/E015.txt
+# t2m/text_mot_match/eval/E010.txt
+# t2m/text_mot_match/eval/E005.txt
+# t2m/length_est_bigru/model/latest.tar
+# t2m/length_est_bigru/meta/std.npy
+# t2m/length_est_bigru/meta/mean.npy
+# t2m/Decomp_SP001_SM001_H512/model/latest.tar
+# t2m/Decomp_SP001_SM001_H512/meta/std.npy
+# t2m/Decomp_SP001_SM001_H512/meta/mean.npy
+# t2m/Comp_v6_KLD01/model/latest.tar
+# t2m/Comp_v6_KLD01/meta/std.npy
+# t2m/Comp_v6_KLD01/meta/mean.npy
+# t2m/Comp_v6_KLD01/opt.txt
+# kit/text_mot_match/model/finest.tar
+# kit/text_mot_match/eval/E120.txt
+# kit/text_mot_match/eval/E115.txt
+# kit/text_mot_match/eval/E110.txt
+# kit/text_mot_match/eval/E105.txt
+# kit/text_mot_match/eval/E100.txt
+# kit/text_mot_match/eval/E095.txt
+# kit/Comp_v6_KLD005/meta/std.npy
+# kit/Comp_v6_KLD005/model/latest.tar
+# kit/Decomp_SP001_SM001_H512/meta/mean.npy
+# kit/Decomp_SP001_SM001_H512/meta/std.npy
+# kit/Decomp_SP001_SM001_H512/model/latest.tar
+# kit/length_est_bigru/meta/mean.npy
+# kit/length_est_bigru/meta/std.npy
+# kit/length_est_bigru/model/latest.tar
+# kit/text_mot_match/eval/E005.txt
+# kit/text_mot_match/eval/E010.txt
+# kit/text_mot_match/eval/E015.txt
+# kit/text_mot_match/eval/E020.txt
+# kit/text_mot_match/eval/E025.txt
+# kit/text_mot_match/eval/E030.txt
+# kit/text_mot_match/eval/E035.txt
+# kit/text_mot_match/eval/E040.txt
+# kit/text_mot_match/eval/E045.txt
+# kit/text_mot_match/eval/E050.txt
+# kit/text_mot_match/eval/E055.txt
+# kit/text_mot_match/eval/E060.txt
+# kit/text_mot_match/eval/E065.txt
+# kit/text_mot_match/eval/E070.txt
+# kit/text_mot_match/eval/E075.txt
+# kit/text_mot_match/eval/E080.txt
+# kit/text_mot_match/eval/E085.txt
+# kit/text_mot_match/eval/E090.txt
