@@ -1,4 +1,4 @@
-name: mdm
+name: mgp
 channels:
   - pytorch
   - anaconda
