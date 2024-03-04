@@ -132,7 +132,9 @@ dmypy.json
 t2m
 kit
 glove
+save
 smpl
+dataset
 assets/actionrecognition/humanact12_gru.tar
 assets/actionrecognition/uestc_rot6d_stgcn.tar
 body_models/smpl/J_regressor_extra.npy
