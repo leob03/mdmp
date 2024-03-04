@@ -203,3 +203,9 @@ glove/our_vab_words.pkl
 # kit/text_mot_match/eval/E090.txt
 dataset/HumanAct12Poses/humanact12poses.pkl
 dataset/uestc.tar.bz2gms8a8yatmp
+dataset/uestc/globtrans_usez.pkl
+dataset/uestc/vibe_cache_refined.pkl
+dataset/uestc/info/action_classes.txt
+dataset/uestc/info/names.txt
+dataset/uestc/info/num_frames_min.txt
+dataset/uestc/info/num_frames.txt
