@@ -15,6 +15,7 @@ from data_loaders.get_data import get_dataset_loader
 from data_loaders.humanml.scripts.motion_process import recover_from_ric
 import data_loaders.humanml.utils.paramUtil as paramUtil
 from data_loaders.humanml.utils.plot_script import plot_3d_motion
+from data_loaders.humanml.utils.plot_script import plot_3d_motion_with_spheres
 import shutil
 from data_loaders.tensors import collate
 
@@ -187,7 +188,8 @@ def main():
             save_file = sample_file_template.format(sample_i, rep_i)
             print(sample_print_template.format(caption, sample_i, rep_i, save_file))
             animation_save_path = os.path.join(out_path, save_file)
-            plot_3d_motion(animation_save_path, skeleton, motion, dataset=args.dataset, title=caption, fps=fps)
+            # plot_3d_motion(animation_save_path, skeleton, motion, dataset=args.dataset, title=caption, fps=fps)
+            plot_3d_motion_with_spheres(animation_save_path, skeleton, motion, dataset=args.dataset, title=caption, fps=fps)
             # Credit for visualization: https://github.com/EricGuo5513/text-to-motion
             rep_files.append(animation_save_path)
 
