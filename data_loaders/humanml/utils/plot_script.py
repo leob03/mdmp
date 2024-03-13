@@ -226,45 +226,49 @@ def plot_3d_motion(save_path, kinematic_tree, joints, title, dataset, figsize=(3
 
 #     plt.close()
 
-def plot_3d_motion_with_spheres(save_path, kinematic_tree, joints, title, dataset, figsize=(3, 3), fps=120, radius=3, sphere_radius=0.05, sphere_indices=[1, 5, 10], vis_mode='default', gt_frames=[]):
-    title = '\n'.join(wrap(title, 60))  # Format title for better display
+def plot_3d_motion_with_spheres(save_path, kinematic_tree, joints, title, dataset, figsize=(3, 3), fps=120, radius=3, vis_mode='default', gt_frames=[], sphere_radius=0.05, sphere_indices=[1, 5, 10]):
+    matplotlib.use('Agg')
+    title = '\n'.join(wrap(title, 60))
     fig = plt.figure(figsize=figsize)
     ax = p3.Axes3D(fig)
 
-    # Set the limits of the plot
     def init():
         ax.set_xlim3d([-radius / 2, radius / 2])
         ax.set_ylim3d([0, radius])
         ax.set_zlim3d([-radius / 3., radius * 2 / 3.])
         fig.suptitle(title, fontsize=10)
-        ax.grid(False)
+        ax.grid(b=False)
 
-    data = joints.copy().reshape(len(joints), -1, 3)  # Reshape data for plotting
+    data = joints.copy().reshape(len(joints), -1, 3)
 
-    # Function to plot a plane (used to illustrate the ground)
-    def plot_xz_plane(ax, minx, maxx, miny, minz, maxz):
-        verts = [[minx, miny, minz], [minx, miny, maxz], [maxx, miny, maxz], [maxx, miny, minz]]
-        ax.add_collection3d(Poly3DCollection([verts], facecolors='gray', linewidths=1, edgecolors='r', alpha=.25))
+    if dataset == 'kit':
+        data *= 0.003
+    elif dataset == 'humanml':
+        data *= 1.3
+    elif dataset in ['humanact12', 'uestc']:
+        data *= -1.5
+
+    def _draw_sphere(ax, center, radius):
+        u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
+        x = center[0] + radius * np.outer(np.sin(v), np.cos(u))
+        y = center[1] + radius * np.outer(np.sin(v), np.sin(u))
+        z = center[2] + radius * np.outer(np.cos(v), np.ones_like(u))
+        ax.plot_surface(x, y, z, color='r', alpha=0.6)
 
     def update(index):
         ax.clear()
         init()
-        plot_xz_plane(ax, -radius / 2, radius / 2, 0, -radius / 3, radius * 2 / 3)
-
-        # Plotting the skeleton
-        for i, (chain, color) in enumerate(zip(kinematic_tree, plt.cm.tab10.colors)):
+        for chain, color in zip(kinematic_tree, ["#DD5A37"] * len(kinematic_tree)):
             ax.plot3D(data[index, chain, 0], data[index, chain, 1], data[index, chain, 2], color=color)
-
-        # Plotting spheres at specific joints
         for joint_index in sphere_indices:
-            joint_coords = data[index, joint_index]
-            ax.scatter(joint_coords[0], joint_coords[1], joint_coords[2], s=1000 * sphere_radius**2, color='red', alpha=0.6)
-
+            _draw_sphere(ax, data[index, joint_index], sphere_radius)
         plt.axis('off')
 
-    writer = FFMpegFileWriter(fps=fps)
-    ani = FuncAnimation(fig, update, frames=len(joints), interval=1000 / fps, init_func=init, repeat=False)
-    ani.save(save_path, writer=writer)
+    ani = FuncAnimation(fig, update, frames=len(data), interval=1000/fps, init_func=init, repeat=False)
+
+    writer = FFMpegFileWriter(fps=fps)  # Initialize the writer with FPS
+    ani.save(save_path, writer=writer)  # Use the writer without additional fps argument
+
     plt.close()
 
 def _draw_ellipsoid(ax, center, radii):

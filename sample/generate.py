@@ -188,7 +188,7 @@ def main():
             save_file = sample_file_template.format(sample_i, rep_i)
             print(sample_print_template.format(caption, sample_i, rep_i, save_file))
             animation_save_path = os.path.join(out_path, save_file)
-            plot_3d_motion_with_spheres(animation_save_path, skeleton, motion, dataset=args.dataset, title=caption, fps=fps)
+            plot_3d_motion(animation_save_path, skeleton, motion, dataset=args.dataset, title=caption, fps=fps)
             
             # fixed_variance_value = 0.1  # This is an arbitrary value you might want to adjust
             # variance = np.full(motion.shape, fixed_variance_value)  # Create an array filled with the fixed variance

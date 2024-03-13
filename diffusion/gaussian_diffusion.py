@@ -542,10 +542,13 @@ class GaussianDiffusion:
                 cond_fn, out, x, t, model_kwargs=model_kwargs
             )
         # print('mean', out["mean"].shape, out["mean"])
+        #([10, 25, 6, 60])
         # print('log_variance', out["log_variance"].shape, out["log_variance"])
+        #([10, 25, 6, 60])
         # print('nonzero_mask', nonzero_mask.shape, nonzero_mask)
+        # torch.Size([10, 1, 1, 1])
         sample = out["mean"] + nonzero_mask * th.exp(0.5 * out["log_variance"]) * noise
-        #keep track of the mean and variance for the last step of the denoising process
+        #keep track of the mean and variance
         return {"sample": sample, "pred_xstart": out["pred_xstart"]}
 
     def p_sample_with_grad(
