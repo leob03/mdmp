@@ -55,7 +55,8 @@ def create_gaussian_diffusion(args):
     steps = args.diffusion_steps
     scale_beta = 1.  # no scaling
     timestep_respacing = ''  # can be used for ddim sampling, we don't use it.
-    learn_sigma = False
+    # learn_sigma = False
+    learn_sigma = True
     rescale_timesteps = False
 
     betas = gd.get_named_beta_schedule(args.noise_schedule, steps, scale_beta)
