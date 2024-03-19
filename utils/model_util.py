@@ -61,7 +61,7 @@ def create_gaussian_diffusion(args):
 
     betas = gd.get_named_beta_schedule(args.noise_schedule, steps, scale_beta)
     # loss_type = gd.LossType.MSE
-    loss_type = gd.LossType.RESCALED_KL
+    loss_type = gd.LossType.RESCALED_MSE
 
     model_var_type = gd.ModelVarType.LEARNED_RANGE if learn_sigma else gd.ModelVarType.FIXED_LARGE
 

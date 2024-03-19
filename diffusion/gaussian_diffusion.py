@@ -314,6 +314,8 @@ class GaussianDiffusion:
             # print('inpainted_motion', inpainted_motion.shape, inpainted_motion)
 
         if self.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
+            print('model_output', model_output.shape, model_output)
+            print(B, C * 2, x.shape[2:])
             assert model_output.shape == (B, C * 2, *x.shape[2:])
             model_output, model_var_values = th.split(model_output, C, dim=1)
             if self.model_var_type == ModelVarType.LEARNED:
@@ -329,6 +331,7 @@ class GaussianDiffusion:
                 model_log_variance = frac * max_log + (1 - frac) * min_log
                 model_variance = th.exp(model_log_variance)
         else:
+            print('goes here!')
             model_variance, model_log_variance = {
                 # for fixedlarge, we set the initial (log-)variance like so
                 # to get a better decoder log likelihood.
@@ -1278,6 +1281,8 @@ class GaussianDiffusion:
                 ModelVarType.LEARNED_RANGE,
             ]:
                 B, C = x_t.shape[:2]
+                print('model_output', model_output.shape)
+                print('B, C*2, *x_t.shape[2:]', B, C * 2, *x_t.shape[2:])
                 assert model_output.shape == (B, C * 2, *x_t.shape[2:])
                 model_output, model_var_values = th.split(model_output, C, dim=1)
                 # Learn the variance using the variational bound, but don't let

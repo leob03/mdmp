@@ -185,7 +185,19 @@ class MDM(nn.Module):
             output, _ = self.gru(xseq)
 
         output = self.output_process(output)  # [bs, njoints, nfeats, nframes]
-        return output
+        # print('output', output.shape)
+
+        #To learn the variance:
+        doubled_output = torch.cat([output, output], dim=2)
+        mean, log_variance = doubled_output.chunk(2, dim=2)  # Split along the feature dimension
+
+        # Ensure log_variance is in a reasonable range, e.g., through a softplus function
+        log_variance = torch.nn.functional.softplus(log_variance)
+
+        # Concatenate mean and log_variance along the channel dimension
+        final_output = torch.cat([mean, log_variance], dim=2)  # Resulting shape should be [bs, njoints, 2*nfeats, nframes]
+        print('final_output', final_output.shape)
+        return final_output
 
 
     def _apply(self, fn):
