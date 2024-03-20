@@ -188,15 +188,15 @@ class MDM(nn.Module):
         # print('output', output.shape)
 
         #To learn the variance:
-        doubled_output = torch.cat([output, output], dim=2)
-        mean, log_variance = doubled_output.chunk(2, dim=2)  # Split along the feature dimension
+        doubled_output = torch.cat([output, output], dim=1)
+        mean, log_variance = doubled_output.chunk(2, dim=1)  # Split along the channel dimension
 
         # Ensure log_variance is in a reasonable range, e.g., through a softplus function
         log_variance = torch.nn.functional.softplus(log_variance)
 
         # Concatenate mean and log_variance along the channel dimension
-        final_output = torch.cat([mean, log_variance], dim=2)  # Resulting shape should be [bs, njoints, 2*nfeats, nframes]
-        print('final_output', final_output.shape)
+        final_output = torch.cat([mean, log_variance], dim=1)  # Resulting shape should be [bs, 2*njoints, nfeats, nframes]
+        # print('final_output', final_output.shape)
         return final_output
 
 

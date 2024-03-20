@@ -304,6 +304,7 @@ class GaussianDiffusion:
         assert t.shape == (B,)
         model_output = model(x, self._scale_timesteps(t), **model_kwargs)
 
+        # print(model_kwargs)
         if 'inpainting_mask' in model_kwargs['y'].keys() and 'inpainted_motion' in model_kwargs['y'].keys():
             inpainting_mask, inpainted_motion = model_kwargs['y']['inpainting_mask'], model_kwargs['y']['inpainted_motion']
             assert self.model_mean_type == ModelMeanType.START_X, 'This feature supports only X_start pred for mow!'
@@ -1281,8 +1282,8 @@ class GaussianDiffusion:
                 ModelVarType.LEARNED_RANGE,
             ]:
                 B, C = x_t.shape[:2]
-                print('model_output', model_output.shape)
-                print('B, C*2, *x_t.shape[2:]', B, C * 2, *x_t.shape[2:])
+                # print('model_output', model_output.shape)
+                # print('B, C*2, *x_t.shape[2:]', B, C * 2, *x_t.shape[2:])
                 assert model_output.shape == (B, C * 2, *x_t.shape[2:])
                 model_output, model_var_values = th.split(model_output, C, dim=1)
                 # Learn the variance using the variational bound, but don't let
