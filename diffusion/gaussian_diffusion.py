@@ -315,8 +315,8 @@ class GaussianDiffusion:
             # print('inpainted_motion', inpainted_motion.shape, inpainted_motion)
 
         if self.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
-            print('model_output', model_output.shape, model_output)
-            print(B, C * 2, x.shape[2:])
+            # print('model_output', model_output.shape, model_output)
+            # print(B, C * 2, x.shape[2:])
             assert model_output.shape == (B, C * 2, *x.shape[2:])
             model_output, model_var_values = th.split(model_output, C, dim=1)
             if self.model_var_type == ModelVarType.LEARNED:
@@ -332,7 +332,7 @@ class GaussianDiffusion:
                 model_log_variance = frac * max_log + (1 - frac) * min_log
                 model_variance = th.exp(model_log_variance)
         else:
-            print('goes here!')
+            # print('goes here!')
             model_variance, model_log_variance = {
                 # for fixedlarge, we set the initial (log-)variance like so
                 # to get a better decoder log likelihood.
@@ -1290,11 +1290,12 @@ class GaussianDiffusion:
                 # it affect our mean prediction.
                 frozen_out = th.cat([model_output.detach(), model_var_values], dim=1)
                 terms["vb"] = self._vb_terms_bpd(
-                    model=lambda *args, r=frozen_out: r,
+                    model=lambda *args, **kwargs: frozen_out,
                     x_start=x_start,
                     x_t=x_t,
                     t=t,
                     clip_denoised=False,
+                    model_kwargs=model_kwargs,
                 )["output"]
                 if self.loss_type == LossType.RESCALED_MSE:
                     # Divide by 1000 for equivalence with initial implementation.
