@@ -19,6 +19,8 @@ from data_loaders.humanml.networks.evaluator_wrapper import EvaluatorMDMWrapper
 from eval import eval_humanml, eval_humanact12_uestc
 from data_loaders.get_data import get_dataset_loader
 
+from torch.utils.tensorboard import SummaryWriter
+
 
 # For ImageNet experiments, this was a good default value.
 # We found that the lg_loss_scale quickly climbed to
@@ -100,17 +102,38 @@ class TrainLoop:
         self.use_ddp = False
         self.ddp_model = self.model
 
+        self.writer = SummaryWriter(log_dir=self.args.tensorboard_log_dir)
+
+
     def _load_and_sync_parameters(self):
         resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
 
         if resume_checkpoint:
+            # self.resume_step = parse_resume_step_from_filename(resume_checkpoint)
+            # logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
+            # self.model.load_state_dict(
+            #     dist_util.load_state_dict(
+            #         resume_checkpoint, map_location=dist_util.dev()
+            #     )
+            # )
             self.resume_step = parse_resume_step_from_filename(resume_checkpoint)
             logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
-            self.model.load_state_dict(
-                dist_util.load_state_dict(
-                    resume_checkpoint, map_location=dist_util.dev()
-                )
-            )
+            loaded_state_dict = dist_util.load_state_dict(resume_checkpoint, map_location=dist_util.dev())
+
+            # Load state_dict carefully, especially if the model architecture in memory
+            # is expected to have different keys than the state_dict loaded from file.
+            model_state_dict = self.model.state_dict()
+
+            # Update only the keys that exist in the current model
+            updated_state_dict = {k: v for k, v in loaded_state_dict.items() if k in model_state_dict}
+
+            # Report if there are any keys that are not loaded (optional)
+            missing_keys = set(model_state_dict.keys()) - set(updated_state_dict.keys())
+            if missing_keys:
+                logger.log(f"Warning: missing keys in the loaded state_dict: {missing_keys}")
+
+            # Load the updated state_dict
+            self.model.load_state_dict(updated_state_dict, strict=False)
 
     def _load_optimizer_state(self):
         main_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
@@ -162,6 +185,8 @@ class TrainLoop:
         if (self.step - 1) % self.save_interval != 0:
             self.save()
             self.evaluate()
+        
+        self.writer.close()
 
     def evaluate(self):
         if not self.args.eval_during_training:
@@ -241,6 +266,10 @@ class TrainLoop:
                 )
 
             loss = (losses["loss"] * weights).mean()
+            #Tensorboard loss
+            self.writer.add_scalar("Loss/train", loss.item(), self.step + self.resume_step)
+            self.mp_trainer.backward(loss)
+
             log_loss_dict(
                 self.diffusion, t, {k: v * weights for k, v in losses.items()}
             )
@@ -253,6 +282,7 @@ class TrainLoop:
         lr = self.lr * (1 - frac_done)
         for param_group in self.opt.param_groups:
             param_group["lr"] = lr
+            self.writer.add_scalar("Learning_Rate", lr, self.step + self.resume_step)
 
     def log_step(self):
         logger.logkv("step", self.step + self.resume_step)
