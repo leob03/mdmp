@@ -55,11 +55,15 @@ def create_gaussian_diffusion(args):
     steps = args.diffusion_steps
     scale_beta = 1.  # no scaling
     timestep_respacing = ''  # can be used for ddim sampling, we don't use it.
-    learn_sigma = False
+    # learn_sigma = False
+    learn_sigma = True
     rescale_timesteps = False
 
     betas = gd.get_named_beta_schedule(args.noise_schedule, steps, scale_beta)
-    loss_type = gd.LossType.MSE
+    # loss_type = gd.LossType.MSE
+    loss_type = gd.LossType.RESCALED_MSE
+
+    model_var_type = gd.ModelVarType.LEARNED_RANGE if learn_sigma else gd.ModelVarType.FIXED_LARGE
 
     if not timestep_respacing:
         timestep_respacing = [steps]
@@ -70,15 +74,7 @@ def create_gaussian_diffusion(args):
         model_mean_type=(
             gd.ModelMeanType.EPSILON if not predict_xstart else gd.ModelMeanType.START_X
         ),
-        model_var_type=(
-            (
-                gd.ModelVarType.FIXED_LARGE
-                if not args.sigma_small
-                else gd.ModelVarType.FIXED_SMALL
-            )
-            if not learn_sigma
-            else gd.ModelVarType.LEARNED_RANGE
-        ),
+        model_var_type=model_var_type,
         loss_type=loss_type,
         rescale_timesteps=rescale_timesteps,
         lambda_vel=args.lambda_vel,
