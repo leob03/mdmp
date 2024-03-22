@@ -109,13 +109,31 @@ class TrainLoop:
         resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
 
         if resume_checkpoint:
+            # self.resume_step = parse_resume_step_from_filename(resume_checkpoint)
+            # logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
+            # self.model.load_state_dict(
+            #     dist_util.load_state_dict(
+            #         resume_checkpoint, map_location=dist_util.dev()
+            #     )
+            # )
             self.resume_step = parse_resume_step_from_filename(resume_checkpoint)
             logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
-            self.model.load_state_dict(
-                dist_util.load_state_dict(
-                    resume_checkpoint, map_location=dist_util.dev()
-                )
-            )
+            loaded_state_dict = dist_util.load_state_dict(resume_checkpoint, map_location=dist_util.dev())
+
+            # Load state_dict carefully, especially if the model architecture in memory
+            # is expected to have different keys than the state_dict loaded from file.
+            model_state_dict = self.model.state_dict()
+
+            # Update only the keys that exist in the current model
+            updated_state_dict = {k: v for k, v in loaded_state_dict.items() if k in model_state_dict}
+
+            # Report if there are any keys that are not loaded (optional)
+            missing_keys = set(model_state_dict.keys()) - set(updated_state_dict.keys())
+            if missing_keys:
+                logger.log(f"Warning: missing keys in the loaded state_dict: {missing_keys}")
+
+            # Load the updated state_dict
+            self.model.load_state_dict(updated_state_dict, strict=False)
 
     def _load_optimizer_state(self):
         main_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
