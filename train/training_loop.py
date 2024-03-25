@@ -47,7 +47,7 @@ class TrainLoop:
         self.fp16_scale_growth = 1e-3  # deprecating this option
         self.weight_decay = args.weight_decay
         self.lr_anneal_steps = args.lr_anneal_steps
-
+        
         self.step = 0
         self.resume_step = 0
         self.global_batch = self.batch_size # * dist.get_world_size()
@@ -268,7 +268,6 @@ class TrainLoop:
             loss = (losses["loss"] * weights).mean()
             #Tensorboard loss
             self.writer.add_scalar("Loss/train", loss.item(), self.step + self.resume_step)
-            self.mp_trainer.backward(loss)
 
             log_loss_dict(
                 self.diffusion, t, {k: v * weights for k, v in losses.items()}

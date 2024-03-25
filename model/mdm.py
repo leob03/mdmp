@@ -185,6 +185,7 @@ class MDM(nn.Module):
             output, _ = self.gru(xseq)
 
         output = self.output_process(output)  # [bs, njoints, nfeats, nframes]
+        return output
         # print('output', output.shape)
 
         #To learn the variance:

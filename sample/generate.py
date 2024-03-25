@@ -126,6 +126,7 @@ def main():
             const_noise=False,
         )
 
+        print(f"sample shape: {sample.shape}") # [10, 263, 1, 196]
         # Recover XYZ *positions* from HumanML3D vector representation
         if model.data_rep == 'hml_vec':
             n_joints = 22 if sample.shape[1] == 263 else 21
