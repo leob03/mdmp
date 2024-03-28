@@ -161,7 +161,7 @@ class MDM(nn.Module):
             emb_gru = emb_gru.reshape(bs, self.latent_dim, 1, nframes)  #[bs, d, 1, #frames]
             x = torch.cat((x_reshaped, emb_gru), axis=1)  #[bs, d+joints*feat, 1, #frames]
 
-        x = self.input_process(x)
+        x = self.input_process(x) # [seqlen, bs, d]
 
         if self.arch == 'trans_enc':
             # adding the timestep embed
@@ -184,9 +184,10 @@ class MDM(nn.Module):
             xseq = self.sequence_pos_encoder(xseq)  # [seqlen, bs, d]
             output, _ = self.gru(xseq)
 
+        #reverse njoints and nfeats and apply another layer
         output = self.output_process(output)  # [bs, njoints, nfeats, nframes]
-        return output
-        # print('output', output.shape)
+        # return output
+        print('output', output.shape)
 
         #To learn the variance:
         doubled_output = torch.cat([output, output], dim=1)
@@ -299,7 +300,7 @@ class OutputProcess(nn.Module):
             output = torch.cat((first_pose, vel), axis=0)  # [seqlen, bs, 150]
         else:
             raise ValueError
-        output = output.reshape(nframes, bs, self.njoints, self.nfeats)
+        output = output.reshape(nframes, bs, self.njoints, self.nfeats) # (seqlen = nframes) 
         output = output.permute(1, 2, 3, 0)  # [bs, njoints, nfeats, nframes]
         return output
 
