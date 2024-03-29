@@ -332,7 +332,6 @@ class GaussianDiffusion:
                 model_log_variance = frac * max_log + (1 - frac) * min_log
                 model_variance = th.exp(model_log_variance)
         else:
-            # print('goes here!')
             model_variance, model_log_variance = {
                 # for fixedlarge, we set the initial (log-)variance like so
                 # to get a better decoder log likelihood.
@@ -354,7 +353,7 @@ class GaussianDiffusion:
 
             model_variance = _extract_into_tensor(model_variance, t, x.shape)
             model_log_variance = _extract_into_tensor(model_log_variance, t, x.shape)
-
+        
         def process_xstart(x):
             if denoised_fn is not None:
                 x = denoised_fn(x)
@@ -384,8 +383,8 @@ class GaussianDiffusion:
         assert (
             model_mean.shape == model_log_variance.shape == pred_xstart.shape == x.shape
         )
-        print('model_mean', model_mean.shape, model_mean)
-        print('model_log_variance', model_log_variance.shape, model_log_variance)
+        print('model_mean', model_mean.shape)
+        print('model_log_variance', model_log_variance.shape)
         return {
             "mean": model_mean,
             "variance": model_variance,
@@ -547,10 +546,12 @@ class GaussianDiffusion:
             out["mean"] = self.condition_mean(
                 cond_fn, out, x, t, model_kwargs=model_kwargs
             )
-        # print('mean', out["mean"].shape, out["mean"])
+        print('mean', out["mean"].shape)
         #([10, 25, 6, 60])
-        # print('log_variance', out["log_variance"].shape, out["log_variance"])
+        #([10, 263, 1, 196])
+        print('log_variance', out["log_variance"].shape)
         #([10, 25, 6, 60])
+        #([10, 263, 1, 196])
         # print('nonzero_mask', nonzero_mask.shape, nonzero_mask)
         # torch.Size([10, 1, 1, 1])
         sample = out["mean"] + nonzero_mask * th.exp(0.5 * out["log_variance"]) * noise
@@ -602,6 +603,8 @@ class GaussianDiffusion:
                 out["mean"] = self.condition_mean_with_grad(
                     cond_fn, out, x, t, model_kwargs=model_kwargs
                 )
+        print('mean', out["mean"].shape)
+        print('log_variance', out["log_variance"].shape)
         sample = out["mean"] + nonzero_mask * th.exp(0.5 * out["log_variance"]) * noise
         return {"sample": sample, "pred_xstart": out["pred_xstart"].detach()}
 
@@ -705,7 +708,6 @@ class GaussianDiffusion:
 
         if skip_timesteps and init_image is None:
             init_image = th.zeros_like(img)
-
         indices = list(range(self.num_timesteps - skip_timesteps))[::-1]
 
         if init_image is not None:
@@ -725,6 +727,7 @@ class GaussianDiffusion:
                                                size=model_kwargs['y'].shape,
                                                device=model_kwargs['y'].device)
             with th.no_grad():
+                print('here')
                 sample_fn = self.p_sample_with_grad if cond_fn_with_grad else self.p_sample
                 out = sample_fn(
                     model,
@@ -755,6 +758,7 @@ class GaussianDiffusion:
 
         Same usage as p_sample().
         """
+        print('ddim_sample')
         out_orig = self.p_mean_variance(
             model,
             x,
@@ -807,6 +811,7 @@ class GaussianDiffusion:
 
         Same usage as p_sample().
         """
+        print('ddim_sample_with_grad')
         with th.enable_grad():
             x = x.detach().requires_grad_()
             out_orig = self.p_mean_variance(
@@ -861,6 +866,7 @@ class GaussianDiffusion:
         """
         Sample x_{t+1} from the model using DDIM reverse ODE.
         """
+        print('ddim_reverse_sample')
         assert eta == 0.0, "Reverse ODE only for deterministic path"
         out = self.p_mean_variance(
             model,
@@ -910,6 +916,7 @@ class GaussianDiffusion:
 
         Same usage as p_sample_loop().
         """
+        print('ddim_sample_loop')
         if dump_steps is not None:
             raise NotImplementedError()
         if const_noise == True:
@@ -958,6 +965,7 @@ class GaussianDiffusion:
 
         Same usage as p_sample_loop_progressive().
         """
+        print('ddim_sample_loop_progressive')
         if device is None:
             device = next(model.parameters()).device
         assert isinstance(shape, (tuple, list))
@@ -1020,6 +1028,7 @@ class GaussianDiffusion:
 
         Same usage as p_sample().
         """
+        print("plms_sample")
         if not int(order) or not 1 <= order <= 4:
             raise ValueError('order is invalid (should be int from 1-4).')
 
@@ -1108,6 +1117,7 @@ class GaussianDiffusion:
 
         Same usage as p_sample_loop().
         """
+        print("plms_sample_loop")
         final = None
         for sample in self.plms_sample_loop_progressive(
             model,
@@ -1151,6 +1161,7 @@ class GaussianDiffusion:
 
         Same usage as p_sample_loop_progressive().
         """
+        print("plms_sample_loop_progressive")
         if device is None:
             device = next(model.parameters()).device
         assert isinstance(shape, (tuple, list))
