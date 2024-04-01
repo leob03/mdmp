@@ -187,19 +187,19 @@ class MDM(nn.Module):
         #reverse njoints and nfeats and apply another layer
         output = self.output_process(output)  # [bs, njoints, nfeats, nframes]
         # return output
-        print('output', output.shape)
+        # print('output', output.shape)
 
-        #To learn the variance:
-        doubled_output = torch.cat([output, output], dim=1)
-        mean, log_variance = doubled_output.chunk(2, dim=1)  # Split along the channel dimension
+        # #To learn the variance:
+        # doubled_output = torch.cat([output, output], dim=1)
+        # mean, log_variance = doubled_output.chunk(2, dim=1)  # Split along the channel dimension
 
-        # Ensure log_variance is in a reasonable range, e.g., through a softplus function
-        log_variance = torch.nn.functional.softplus(log_variance)
+        # # Ensure log_variance is in a reasonable range, e.g., through a softplus function
+        # log_variance = torch.nn.functional.softplus(log_variance)
 
-        # Concatenate mean and log_variance along the channel dimension
-        final_output = torch.cat([mean, log_variance], dim=1)  # Resulting shape should be [bs, 2*njoints, nfeats, nframes]
-        # print('final_output', final_output.shape)
-        return final_output
+        # # Concatenate mean and log_variance along the channel dimension
+        # final_output = torch.cat([mean, log_variance], dim=1)  # Resulting shape should be [bs, 2*njoints, nfeats, nframes]
+        # # print('final_output', final_output.shape)
+        return output
 
 
     def _apply(self, fn):
@@ -284,24 +284,26 @@ class OutputProcess(nn.Module):
         self.latent_dim = latent_dim
         self.njoints = njoints
         self.nfeats = nfeats
-        self.poseFinal = nn.Linear(self.latent_dim, self.input_feats)
+        # Update: Output layer now has 2 * input_feats to include variance
+        self.poseFinal = nn.Linear(self.latent_dim, self.input_feats * 2)  # Updated
         if self.data_rep == 'rot_vel':
-            self.velFinal = nn.Linear(self.latent_dim, self.input_feats)
+            self.velFinal = nn.Linear(self.latent_dim, self.input_feats * 2)  # Updated
 
     def forward(self, output):
         nframes, bs, d = output.shape
         if self.data_rep in ['rot6d', 'xyz', 'hml_vec']:
-            output = self.poseFinal(output)  # [seqlen, bs, 150]
+            output = self.poseFinal(output)
         elif self.data_rep == 'rot_vel':
-            first_pose = output[[0]]  # [1, bs, d]
-            first_pose = self.poseFinal(first_pose)  # [1, bs, 150]
-            vel = output[1:]  # [seqlen-1, bs, d]
-            vel = self.velFinal(vel)  # [seqlen-1, bs, 150]
-            output = torch.cat((first_pose, vel), axis=0)  # [seqlen, bs, 150]
+            first_pose = output[[0]]
+            first_pose = self.poseFinal(first_pose)
+            vel = output[1:]
+            vel = self.velFinal(vel)
+            output = torch.cat((first_pose, vel), axis=0)
         else:
             raise ValueError
-        output = output.reshape(nframes, bs, self.njoints, self.nfeats) # (seqlen = nframes) 
-        output = output.permute(1, 2, 3, 0)  # [bs, njoints, nfeats, nframes]
+        # Update: Reshape to include doubled features for mean and variance
+        output = output.reshape(nframes, bs, 2 * self.njoints, self.nfeats)  # Updated
+        output = output.permute(1, 2, 3, 0)  # [bs, 2 *njoints, nfeats, nframes] Updated
         return output
 
 

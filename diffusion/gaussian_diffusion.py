@@ -383,8 +383,8 @@ class GaussianDiffusion:
         assert (
             model_mean.shape == model_log_variance.shape == pred_xstart.shape == x.shape
         )
-        print('model_mean', model_mean.shape)
-        print('model_log_variance', model_log_variance.shape)
+        # print('model_mean', model_mean.shape)
+        # print('model_log_variance', model_log_variance.shape)
         return {
             "mean": model_mean,
             "variance": model_variance,
