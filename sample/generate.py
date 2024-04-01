@@ -112,7 +112,7 @@ def main():
 
         sample_fn = diffusion.p_sample_loop
 
-        sample = sample_fn(
+        sample, log_variance = sample_fn(
             model,
             # (args.batch_size, model.njoints, model.nfeats, n_frames),  # BUG FIX - this one caused a mismatch between training and inference
             (args.batch_size, model.njoints, model.nfeats, max_frames),  # BUG FIX
@@ -127,6 +127,7 @@ def main():
         )
 
         print(f"sample shape: {sample.shape}") # [10, 263, 1, 196]
+        print(f"log_variance shape: {log_variance.shape}") # [10, 263, 1, 196]
         # Recover XYZ *positions* from HumanML3D vector representation
         if model.data_rep == 'hml_vec':
             n_joints = 22 if sample.shape[1] == 263 else 21

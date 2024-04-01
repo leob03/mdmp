@@ -546,17 +546,17 @@ class GaussianDiffusion:
             out["mean"] = self.condition_mean(
                 cond_fn, out, x, t, model_kwargs=model_kwargs
             )
-        print('mean', out["mean"].shape)
+        # print('mean', out["mean"].shape)
         #([10, 25, 6, 60])
         #([10, 263, 1, 196])
-        print('log_variance', out["log_variance"].shape)
+        # print('log_variance', out["log_variance"].shape)
         #([10, 25, 6, 60])
         #([10, 263, 1, 196])
         # print('nonzero_mask', nonzero_mask.shape, nonzero_mask)
         # torch.Size([10, 1, 1, 1])
         sample = out["mean"] + nonzero_mask * th.exp(0.5 * out["log_variance"]) * noise
         #keep track of the mean and variance
-        return {"sample": sample, "pred_xstart": out["pred_xstart"]}
+        return {"sample": sample, "pred_xstart": out["pred_xstart"], "log_variance": out["log_variance"]}
 
     def p_sample_with_grad(
         self,
@@ -603,10 +603,10 @@ class GaussianDiffusion:
                 out["mean"] = self.condition_mean_with_grad(
                     cond_fn, out, x, t, model_kwargs=model_kwargs
                 )
-        print('mean', out["mean"].shape)
-        print('log_variance', out["log_variance"].shape)
+        # print('mean', out["mean"].shape)
+        # print('log_variance', out["log_variance"].shape)
         sample = out["mean"] + nonzero_mask * th.exp(0.5 * out["log_variance"]) * noise
-        return {"sample": sample, "pred_xstart": out["pred_xstart"].detach()}
+        return {"sample": sample, "pred_xstart": out["pred_xstart"].detach(), "log_variance": out["log_variance"]}
 
     def p_sample_loop(
         self,
@@ -671,7 +671,7 @@ class GaussianDiffusion:
             final = sample
         if dump_steps is not None:
             return dump
-        return final["sample"]
+        return final["sample"], final["log_variance"]
 
     def p_sample_loop_progressive(
         self,
@@ -727,7 +727,7 @@ class GaussianDiffusion:
                                                size=model_kwargs['y'].shape,
                                                device=model_kwargs['y'].device)
             with th.no_grad():
-                print('here')
+                # print('here')
                 sample_fn = self.p_sample_with_grad if cond_fn_with_grad else self.p_sample
                 out = sample_fn(
                     model,
