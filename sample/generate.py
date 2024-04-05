@@ -15,7 +15,7 @@ from data_loaders.get_data import get_dataset_loader
 from data_loaders.humanml.scripts.motion_process import recover_from_ric
 import data_loaders.humanml.utils.paramUtil as paramUtil
 from data_loaders.humanml.utils.plot_script import plot_3d_motion
-from data_loaders.humanml.utils.plot_script import plot_3d_motion_with_spheres
+# from data_loaders.humanml.utils.plot_script import plot_3d_motion_with_spheres
 import shutil
 from data_loaders.tensors import collate
 
@@ -100,6 +100,7 @@ def main():
         _, model_kwargs = collate(collate_args)
 
     all_motions = []
+    all_variances = []
     all_lengths = []
     all_text = []
 
@@ -126,20 +127,26 @@ def main():
             const_noise=False,
         )
 
-        print(f"sample shape: {sample.shape}") # [10, 263, 1, 196]
-        print(f"log_variance shape: {log_variance.shape}") # [10, 263, 1, 196]
+        # print(f"sample shape: {sample.shape}") # [10, 263, 1, 196]
+        # print(f"log_variance shape: {log_variance.shape}") # [10, 263, 1, 196]
         # Recover XYZ *positions* from HumanML3D vector representation
         if model.data_rep == 'hml_vec':
             n_joints = 22 if sample.shape[1] == 263 else 21
             sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float()
+            log_variance = data.dataset.t2m_dataset.inv_transform(log_variance.cpu().permute(0, 2, 3, 1)).float()
             sample = recover_from_ric(sample, n_joints)
+            log_variance = recover_from_ric(log_variance, n_joints)
             sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1)
+            log_variance = log_variance.view(-1, *log_variance.shape[2:]).permute(0, 2, 3, 1)
 
         rot2xyz_pose_rep = 'xyz' if model.data_rep in ['xyz', 'hml_vec'] else model.data_rep
         rot2xyz_mask = None if rot2xyz_pose_rep == 'xyz' else model_kwargs['y']['mask'].reshape(args.batch_size, n_frames).bool()
         sample = model.rot2xyz(x=sample, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
                                jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
                                get_rotations_back=False)
+        # log_variance = model.rot2xyz(x=log_variance, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
+        #                              jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
+        #                              get_rotations_back=False)
 
         if args.unconstrained:
             all_text += ['unconstrained'] * args.num_samples
@@ -148,13 +155,16 @@ def main():
             all_text += model_kwargs['y'][text_key]
 
         all_motions.append(sample.cpu().numpy())
+        all_variances.append(log_variance.cpu().numpy())
         all_lengths.append(model_kwargs['y']['lengths'].cpu().numpy())
 
         print(f"created {len(all_motions) * args.batch_size} samples")
 
 
     all_motions = np.concatenate(all_motions, axis=0)
+    all_variances = np.concatenate(all_variances, axis=0)
     all_motions = all_motions[:total_num_samples]  # [bs, njoints, 6, seqlen]
+    all_variances = all_variances[:total_num_samples]
     all_text = all_text[:total_num_samples]
     all_lengths = np.concatenate(all_lengths, axis=0)[:total_num_samples]
 
@@ -165,7 +175,7 @@ def main():
     npy_path = os.path.join(out_path, 'results.npy')
     print(f"saving results file to [{npy_path}]")
     np.save(npy_path,
-            {'motion': all_motions, 'text': all_text, 'lengths': all_lengths,
+            {'motion': all_motions, 'variances': all_variances, 'text': all_text, 'lengths': all_lengths,
              'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
     with open(npy_path.replace('.npy', '.txt'), 'w') as fw:
         fw.write('\n'.join(all_text))
@@ -187,17 +197,11 @@ def main():
             caption = all_text[rep_i*args.batch_size + sample_i]
             length = all_lengths[rep_i*args.batch_size + sample_i]
             motion = all_motions[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
+            variance = all_variances[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
             save_file = sample_file_template.format(sample_i, rep_i)
             print(sample_print_template.format(caption, sample_i, rep_i, save_file))
             animation_save_path = os.path.join(out_path, save_file)
-            plot_3d_motion(animation_save_path, skeleton, motion, dataset=args.dataset, title=caption, fps=fps)
-            
-            # fixed_variance_value = 0.1  # This is an arbitrary value you might want to adjust
-            # variance = np.full(motion.shape, fixed_variance_value)  # Create an array filled with the fixed variance
-            # save_file = sample_file_template.format(sample_i, rep_i)
-            # print(sample_print_template.format(caption, sample_i, rep_i, save_file))
-            # animation_save_path = os.path.join(out_path, save_file)
-            # plot_3d_motion_with_spheres(animation_save_path, skeleton, motion, variance, title=caption, dataset=args.dataset, fps=fps)
+            plot_3d_motion(animation_save_path, skeleton, motion, variance, dataset=args.dataset, title=caption, fps=fps) #modify plot_3d_motion to include variance
             
             rep_files.append(animation_save_path)
 
