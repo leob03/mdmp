@@ -192,9 +192,9 @@ class CompMDMGeneratedDataset(Dataset):
                 mm_motions = []
                 for t in range(repeat_times):
 
-                    sample = sample_fn(
-                        model,
-                        motion.shape,
+                    sample, log_variance = sample_fn(
+                        model=model,
+                        shape=motion.shape,
                         clip_denoised=clip_denoised,
                         model_kwargs=model_kwargs,
                         skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
@@ -212,9 +212,6 @@ class CompMDMGeneratedDataset(Dataset):
                             'length': model_kwargs['y']['lengths'][bs_i].cpu().numpy(),
                             'caption': model_kwargs['y']['text'][bs_i],
                             'tokens': tokens[bs_i],
-                            # Fixed cap_len calculation, changed from len(tokens[bs_i])
-                            # Lead to improved R-precision and Multimodal Dist.
-                            # issue: https://github.com/GuyTevet/motion-diffusion-model/issues/182
                             'cap_len': tokens[bs_i].index('eos/OTHER') + 1, 
                             } for bs_i in range(dataloader.batch_size)]
                         generated_motion += sub_dicts
