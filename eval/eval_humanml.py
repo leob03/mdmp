@@ -88,6 +88,14 @@ def evaluate_fid(eval_wrapper, groundtruth_loader, activation_dict, file):
     for model_name, motion_embeddings in activation_dict.items():
         mu, cov = calculate_activation_statistics(motion_embeddings)
         # print(mu)
+        if np.any(np.isnan(mu)) or np.any(np.isinf(cov)):
+            print("mu or cov contains NaNs or Infs")
+        if np.any(np.isnan(gt_mu)) or np.any(np.isinf(gt_cov)):
+            print("gt_mu or gt_cov contains NaNs or Infs")
+        gt_mu = np.nan_to_num(gt_mu, nan=0.0, posinf=0.0, neginf=0.0)
+        gt_cov = np.nan_to_num(gt_cov, nan=0.0, posinf=0.0, neginf=0.0)
+        mu = np.nan_to_num(mu, nan=0.0, posinf=0.0, neginf=0.0)
+        cov = np.nan_to_num(cov, nan=0.0, posinf=0.0, neginf=0.0)
         fid = calculate_frechet_distance(gt_mu, gt_cov, mu, cov)
         print(f'---> [{model_name}] FID: {fid:.4f}')
         print(f'---> [{model_name}] FID: {fid:.4f}', file=file, flush=True)
