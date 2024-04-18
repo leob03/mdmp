@@ -148,12 +148,11 @@ class MDM(nn.Module):
 
         force_mask = y.get('uncond', False)
         if 'text' in self.cond_mode:
-            # enc_text = self.encode_text(y['text'])
-            if 'text' in y:
-                text_embed = self.encode_text(y['text'])
-                del y['text']
-                y['text_embed'] = text_embed
-            enc_text = y["text_embed"]
+            # enc_text = self.encode_text(y['text'])        #with the next 4 lines, we allow the model to only call CLIP once per denoising process and reuse the embeddings
+            if 'text_embed' in y.keys():  # caching option
+                enc_text = y['text_embed']
+            else:
+                enc_text = self.encode_text(y['text'])
             emb += self.embed_text(self.mask_cond(enc_text, force_mask=force_mask))
         if 'action' in self.cond_mode:
             action_emb = self.embed_action(y['action'])

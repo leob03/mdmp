@@ -15,7 +15,6 @@ from data_loaders.get_data import get_dataset_loader
 from data_loaders.humanml.scripts.motion_process import recover_from_ric
 import data_loaders.humanml.utils.paramUtil as paramUtil
 from data_loaders.humanml.utils.plot_script import plot_3d_motion
-# from data_loaders.humanml.utils.plot_script import plot_3d_motion_with_spheres
 import shutil
 from data_loaders.tensors import collate
 
