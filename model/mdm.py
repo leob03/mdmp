@@ -148,7 +148,12 @@ class MDM(nn.Module):
 
         force_mask = y.get('uncond', False)
         if 'text' in self.cond_mode:
-            enc_text = self.encode_text(y['text'])
+            # enc_text = self.encode_text(y['text'])
+            if 'text' in y:
+                text_embed = self.encode_text(y['text'])
+                del y['text']
+                y['text_embed'] = text_embed
+            enc_text = y["text_embed"]
             emb += self.embed_text(self.mask_cond(enc_text, force_mask=force_mask))
         if 'action' in self.cond_mode:
             action_emb = self.embed_action(y['action'])
@@ -184,21 +189,7 @@ class MDM(nn.Module):
             xseq = self.sequence_pos_encoder(xseq)  # [seqlen, bs, d]
             output, _ = self.gru(xseq)
 
-        #reverse njoints and nfeats and apply another layer
         output = self.output_process(output)  # [bs, njoints, nfeats, nframes]
-        # return output
-        # print('output', output.shape)
-
-        # #To learn the variance:
-        # doubled_output = torch.cat([output, output], dim=1)
-        # mean, log_variance = doubled_output.chunk(2, dim=1)  # Split along the channel dimension
-
-        # # Ensure log_variance is in a reasonable range, e.g., through a softplus function
-        # log_variance = torch.nn.functional.softplus(log_variance)
-
-        # # Concatenate mean and log_variance along the channel dimension
-        # final_output = torch.cat([mean, log_variance], dim=1)  # Resulting shape should be [bs, 2*njoints, nfeats, nframes]
-        # # print('final_output', final_output.shape)
         return output
 
 
