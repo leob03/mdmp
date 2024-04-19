@@ -47,6 +47,7 @@ class MDM(nn.Module):
         self.cond_mask_prob = kargs.get('cond_mask_prob', 0.)
         self.arch = arch
         self.gru_emb_dim = self.latent_dim if self.arch == 'gru' else 0
+        self.motion_input_linear = nn.Linear(self.input_feats, self.latent_dim)
         self.input_process = InputProcess(self.data_rep, self.input_feats+self.gru_emb_dim, self.latent_dim)
 
         self.sequence_pos_encoder = PositionalEncoding(self.latent_dim, self.dropout)
