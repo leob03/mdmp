@@ -169,8 +169,10 @@ class MDM(nn.Module):
         x = self.input_process(x) # [seqlen, bs, d]
 
         if 'motion_embed' in y.keys():  # caching option
-            print('motion_embed' in y.keys(), "multi-modal input detected")
+            # print('motion_embed' in y.keys(), "multi-modal input detected")
             enc_motion = y['motion_embed']
+            bs, njoints, nfeats, nframes = enc_motion.shape
+            enc_motion = enc_motion.permute((3, 0, 1, 2)).reshape(nframes, bs, njoints*nfeats)
             emb_motion = self.motion_input_linear(enc_motion)
             x += emb_motion
 

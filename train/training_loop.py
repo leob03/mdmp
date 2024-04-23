@@ -242,7 +242,10 @@ class TrainLoop:
             assert i == 0
             assert self.microbatch == self.batch_size
             micro = batch
+            # print("micro", micro.shape)
             micro_cond = cond
+            micro_cond['y']['motion_embed'] = batch
+            # print("micro_cond", micro_cond)
             last_batch = (i + self.microbatch) >= batch.shape[0]
             t, weights = self.schedule_sampler.sample(micro.shape[0], dist_util.dev())
 
