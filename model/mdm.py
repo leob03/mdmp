@@ -168,6 +168,12 @@ class MDM(nn.Module):
 
         x = self.input_process(x) # [seqlen, bs, d]
 
+        if 'motion_embed' in y.keys():  # caching option
+            print('motion_embed' in y.keys(), "multi-modal input detected")
+            enc_motion = y['motion_embed']
+            emb_motion = self.motion_input_linear(enc_motion)
+            x += emb_motion
+
         if self.arch == 'trans_enc':
             # adding the timestep embed
             xseq = torch.cat((emb, x), axis=0)  # [seqlen+1, bs, d]
