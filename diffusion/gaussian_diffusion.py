@@ -307,7 +307,7 @@ class GaussianDiffusion:
         # print(model_kwargs)
         if 'inpainting_mask' in model_kwargs['y'].keys() and 'inpainted_motion' in model_kwargs['y'].keys():
             inpainting_mask, inpainted_motion = model_kwargs['y']['inpainting_mask'], model_kwargs['y']['inpainted_motion']
-            assert self.model_mean_type == ModelMeanType.START_X, 'This feature supports only X_start pred for mow!'
+            assert self.model_mean_type == ModelMeanType.START_X, 'This feature supports only X_start pred for now!'
             assert model_output.shape == inpainting_mask.shape == inpainted_motion.shape
             model_output = (model_output * ~inpainting_mask) + (inpainted_motion * inpainting_mask)
             # print('model_output', model_output.shape, model_output)
