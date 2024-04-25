@@ -173,8 +173,12 @@ class MDM(nn.Module):
             enc_motion = y['motion_embed']
             bs, njoints, nfeats, nframes = enc_motion.shape
             enc_motion = enc_motion.permute((3, 0, 1, 2)).reshape(nframes, bs, njoints*nfeats)
-            emb_motion = self.motion_input_linear(enc_motion)
-            x += emb_motion
+            # emb_motion = self.motion_input_linear(enc_motion)
+            # x += emb_motion
+            if enc_motion.shape[0] >= 50 and x.shape[0] >= 50:
+                emb_motion_first_50 = self.motion_input_linear(enc_motion[:50, :, :])
+                x[:50, :, :] += emb_motion_first_50
+
 
         if self.arch == 'trans_enc':
             # adding the timestep embed
