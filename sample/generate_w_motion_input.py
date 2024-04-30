@@ -15,6 +15,7 @@ from data_loaders.get_data import get_dataset_loader
 from data_loaders.humanml.scripts.motion_process import recover_from_ric
 import data_loaders.humanml.utils.paramUtil as paramUtil
 from data_loaders.humanml.utils.plot_script import plot_3d_motion
+from data_loaders.humanml.utils.plot_script import plot_3d_motion_with_gt
 import shutil
 from data_loaders.tensors import collate
 
@@ -90,6 +91,7 @@ def main():
         iterator = iter(data)
         input_motions, model_kwargs = next(iterator)
         input_motions = input_motions.to(dist_util.dev())
+        # print(model_kwargs['y']['text'])
     else:
         collate_args = [{'inp': torch.zeros(n_frames), 'tokens': None, 'lengths': n_frames}] * args.num_samples
         is_t2m = any([args.input_text, args.text_prompt])
@@ -115,7 +117,7 @@ def main():
         # add CFG scale to batch
         if args.guidance_param != 1:
             model_kwargs['y']['scale'] = torch.ones(args.batch_size, device=dist_util.dev()) * args.guidance_param
-
+        model_kwargs['y']['motion_embed'] = input_motions
         sample_fn = diffusion.p_sample_loop
 
         sample, log_variance = sample_fn(
@@ -138,20 +140,34 @@ def main():
         if model.data_rep == 'hml_vec':
             n_joints = 22 if sample.shape[1] == 263 else 21
             sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float()
+            # print(f"sample shape 1: {sample.shape}") # [10, 1, 196, 263]
             log_variance = data.dataset.t2m_dataset.inv_transform(log_variance.cpu().permute(0, 2, 3, 1)).float()
             sample = recover_from_ric(sample, n_joints)
+            # print(f"sample shape 2: {sample.shape}") # [10, 1, 196, 22, 3]
             log_variance = recover_from_ric(log_variance, n_joints)
             sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1)
+            # print(f"sample shape 3: {sample.shape}") # [10, 22, 3, 196]
             log_variance = log_variance.view(-1, *log_variance.shape[2:]).permute(0, 2, 3, 1)
 
+            #reshape input_motions to match the shape of sample
+            input_motions_reshaped = data.dataset.t2m_dataset.inv_transform(input_motions.cpu().permute(0, 2, 3, 1)).float()
+            input_motions_reshaped = recover_from_ric(input_motions_reshaped, n_joints)
+            input_motions_reshaped = input_motions_reshaped.view(-1, *input_motions_reshaped.shape[2:]).permute(0, 2, 3, 1)
+
+        # Applying rot2xyz transformation
         rot2xyz_pose_rep = 'xyz' if model.data_rep in ['xyz', 'hml_vec'] else model.data_rep
         rot2xyz_mask = None if rot2xyz_pose_rep == 'xyz' else model_kwargs['y']['mask'].reshape(args.batch_size, n_frames).bool()
         sample = model.rot2xyz(x=sample, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
                                jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
                                get_rotations_back=False)
-        # log_variance = model.rot2xyz(x=log_variance, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
-        #                              jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
-        #                              get_rotations_back=False)
+        # print(f"sample shape 4: {sample.shape}") # [10, 22, 3, 196]
+        log_variance = model.rot2xyz(x=log_variance, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
+                                     jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
+                                     get_rotations_back=False)
+        
+        input_motions_reshaped = model.rot2xyz(x=input_motions_reshaped, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
+                                  jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
+                                  get_rotations_back=False)
 
         if args.unconstrained:
             all_text += ['unconstrained'] * args.num_samples
@@ -167,8 +183,10 @@ def main():
 
 
     all_motions = np.concatenate(all_motions, axis=0)
+    # print(f"all_motions shape 1: {all_motions.shape}") (30, 22, 3, 196)
     all_variances = np.concatenate(all_variances, axis=0)
     all_motions = all_motions[:total_num_samples]  # [bs, njoints, 6, seqlen]
+    # print(f"all_motions shape 2: {all_motions.shape}") (30, 22, 3, 196)
     all_variances = all_variances[:total_num_samples]
     all_text = all_text[:total_num_samples]
     all_lengths = np.concatenate(all_lengths, axis=0)[:total_num_samples]
@@ -202,11 +220,17 @@ def main():
             caption = all_text[rep_i*args.batch_size + sample_i]
             length = all_lengths[rep_i*args.batch_size + sample_i]
             motion = all_motions[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
+            input_motions_reshaped_np = input_motions_reshaped.cpu().detach().numpy()  # if needed
+            input_motion_reshaped = input_motions_reshaped_np[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
+            # print(f"motion shape: {motion.shape}") (196, 22, 3)
             variance = all_variances[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
             save_file = sample_file_template.format(sample_i, rep_i)
             print(sample_print_template.format(caption, sample_i, rep_i, save_file))
             animation_save_path = os.path.join(out_path, save_file)
-            plot_3d_motion(animation_save_path, skeleton, motion, variance, dataset=args.dataset, title=caption, fps=fps) #modify plot_3d_motion to include variance
+            # plot_3d_motion(animation_save_path, skeleton, motion, variance, dataset=args.dataset, title=caption, fps=fps) #modified plot_3d_motion to include variance
+            assert motion.shape[0] == input_motion_reshaped.shape[0], f"Frame mismatch: joints has {motion.shape[0]} frames, gt_data has {input_motions_reshaped.shape[0]} frames."
+            plot_3d_motion_with_gt(animation_save_path, skeleton, motion, variance, dataset=args.dataset, gt_data=input_motion_reshaped, title=caption, fps=fps) #modified plot_3d_motion to include gt input motions
+
             
             rep_files.append(animation_save_path)
 

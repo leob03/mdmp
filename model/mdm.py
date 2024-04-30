@@ -205,8 +205,8 @@ class MDM(nn.Module):
                 emb_motion_first_50 = self.motion_input_gcn(enc_motion[:, :50, :]) # [bs, 50, d]
                 x[:, :50, :] += emb_motion_first_50
             
-            #reshaping after GCN layer
-            x = x.permute((1, 0, 2)) #[seqlen, bs, d]
+        #reshaping after GCN layer
+        x = x.permute((1, 0, 2)) #[seqlen, bs, d]
             
 
         if self.arch == 'trans_enc':

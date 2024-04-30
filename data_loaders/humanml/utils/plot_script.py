@@ -9,6 +9,7 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import mpl_toolkits.mplot3d.axes3d as p3
 # import cv2
 from textwrap import wrap
+import torch
 
 matplotlib.use('Agg')
 
@@ -151,5 +152,144 @@ def plot_3d_motion(save_path, kinematic_tree, joints, variance, title, dataset, 
 
     plt.close()
 
+
+def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, variance, title, dataset, gt_data=None, figsize=(3, 3), fps=120, radius=3,
+                   vis_mode='default', gt_frames=[]):
+    matplotlib.use('Agg')
+
+    title = '\n'.join(wrap(title, 20))
+
+    def init():
+        ax.set_xlim3d([-radius / 2, radius / 2])
+        ax.set_ylim3d([0, radius])
+        ax.set_zlim3d([-radius / 3., radius * 2 / 3.])
+        # print(title)
+        fig.suptitle(title, fontsize=10)
+        ax.grid(b=False)
+
+    def plot_xzPlane(minx, maxx, miny, minz, maxz):
+        ## Plot a plane XZ
+        verts = [
+            [minx, miny, minz],
+            [minx, miny, maxz],
+            [maxx, miny, maxz],
+            [maxx, miny, minz]
+        ]
+        xz_plane = Poly3DCollection([verts])
+        xz_plane.set_facecolor((0.5, 0.5, 0.5, 0.5))
+        ax.add_collection3d(xz_plane)
+
+    #         return ax
+
+    # (seq_len, joints_num, 3)
+    data = joints.copy().reshape(len(joints), -1, 3)
+
+    # preparation related to specific datasets
+    if dataset == 'kit':
+        data *= 0.003  # scale for visualization
+    elif dataset == 'humanml':
+        data *= 1.3  # scale for visualization
+    elif dataset in ['humanact12', 'uestc']:
+        data *= -1.5 # reverse axes, scale for visualization
+
+    fig = plt.figure(figsize=figsize)
+    plt.tight_layout()
+    ax = p3.Axes3D(fig)
+    init()
+    MINS = data.min(axis=0).min(axis=0)
+    MAXS = data.max(axis=0).max(axis=0)
+    colors_blue = ["#4D84AA", "#5B9965", "#61CEB9", "#34C1E2", "#80B79A"]  # GT color
+    colors_orange = ["#DD5A37", "#D69E00", "#B75A39", "#FF6D00", "#DDB50E"]  # Generation color
+    colors = colors_orange
+    if vis_mode == 'upper_body':  # lower body taken fixed to input motion
+        colors[0] = colors_blue[0]
+        colors[1] = colors_blue[1]
+    elif vis_mode == 'gt':
+        colors = colors_blue
+
+    frame_number = data.shape[0]
+    #     print(dataset.shape)
+
+    height_offset = MINS[1]
+    data[:, :, 1] -= height_offset
+    trajec = data[:, 0, [0, 2]]
+
+    data[..., 0] -= data[:, 0:1, 0]
+    data[..., 2] -= data[:, 0:1, 2]
+
+    #     print(trajec.shape)
+
+    def draw_sphere(position, radius, color='c', alpha=0.1):
+        u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
+        x = radius * np.cos(u) * np.sin(v) + position[0]
+        y = radius * np.sin(u) * np.sin(v) + position[1]
+        z = radius * np.cos(v) + position[2]
+        ax.plot_surface(x, y, z, color=color, alpha=alpha)
+
+    def update(index):
+        #         print(index)
+        ax.lines = []
+        ax.collections = []
+        ax.view_init(elev=120, azim=-90)
+        ax.dist = 7.5
+        #         ax =
+        plot_xzPlane(MINS[0] - trajec[index, 0], MAXS[0] - trajec[index, 0], 0, MINS[2] - trajec[index, 1],
+                     MAXS[2] - trajec[index, 1])
+        #         ax.scatter(dataset[index, :22, 0], dataset[index, :22, 1], dataset[index, :22, 2], color='black', s=3)
+
+        # if index > 1:
+        #     ax.plot3D(trajec[:index, 0] - trajec[index, 0], np.zeros_like(trajec[:index, 0]),
+        #               trajec[:index, 1] - trajec[index, 1], linewidth=1.0,
+        #               color='blue')
+        # #             ax = plot_xzPlane(ax, MINS[0], MAXS[0], 0, MINS[2], MAXS[2])
+
+        used_colors = colors_blue if index in gt_frames else colors
+        for i, (chain, color) in enumerate(zip(kinematic_tree, used_colors)):
+            if i < 5:
+                linewidth = 4.0
+            else:
+                linewidth = 2.0
+            ax.plot3D(data[index, chain, 0], data[index, chain, 1], data[index, chain, 2], linewidth=linewidth,
+                      color=color)
+        #         print(trajec[:index, 0].shape)
+        
+        if gt_data is not None:
+            gt_motion = gt_data[index]
+            # Check if it's a tensor or numpy array and handle reshaping accordingly
+            if isinstance(gt_motion, torch.Tensor):
+                gt_motion = gt_motion.cpu().numpy()  # Convert to numpy array for uniformity
+            
+            if gt_motion.size % 3 == 0:
+                gt_motion = gt_motion.reshape(-1, 3)
+            else:
+                raise ValueError(f"gt_motion of index {index} can't be reshaped to a 2D array of shape [-1, 3]")
+
+            for chain in kinematic_tree:
+                ax.plot3D(gt_motion[chain, 0], gt_motion[chain, 1], gt_motion[chain, 2], linewidth=2.0, color="#4D84AA")
+        
+
+        plt.axis('off')
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.set_zticklabels([])
+
+        specific_joints_indices = [3, 7, 8, 12, 20, 21]
+
+        # Draw spheres around specific joints
+        for joint_idx in specific_joints_indices:
+            joint_position = data[index, joint_idx]
+            # joint_variance = np.exp(np.mean(variance[index, joint_idx]))  # Convert log variance to actual variance
+            joint_variance = np.exp(np.mean(variance[index, joint_idx])) * 0.3
+            radius = np.sqrt(joint_variance) / 3  # Simplified radius calculation
+            draw_sphere(joint_position, radius, color='c', alpha=0.1)
+
+    ani = FuncAnimation(fig, update, frames=frame_number, interval=1000 / fps, repeat=False)
+
+    # writer = FFMpegFileWriter(fps=fps)
+    ani.save(save_path, fps=fps)
+    # ani = FuncAnimation(fig, update, frames=frame_number, interval=1000 / fps, repeat=False, init_func=init)
+    # ani.save(save_path, writer='pillow', fps=1000 / fps)
+
+    plt.close()
 
 
