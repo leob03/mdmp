@@ -221,7 +221,7 @@ def main():
             length = all_lengths[rep_i*args.batch_size + sample_i]
             motion = all_motions[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
             input_motions_reshaped_np = input_motions_reshaped.cpu().detach().numpy()  # if needed
-            input_motion_reshaped = input_motions_reshaped_np[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
+            input_motion_reshaped = input_motions_reshaped_np[sample_i].transpose(2, 0, 1)[:length]
             # print(f"motion shape: {motion.shape}") (196, 22, 3)
             variance = all_variances[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
             save_file = sample_file_template.format(sample_i, rep_i)
