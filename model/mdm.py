@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import clip
 from model.rotation2xyz import Rotation2xyz
-from utils.model_util import GraphConvolution
+from model.gcn import GraphConvolution
 
 
 
@@ -51,7 +51,7 @@ class MDM(nn.Module):
 
         self.motion_input_linear = nn.Linear(self.input_feats, self.latent_dim)
 
-        self.motion_input_gcn = GraphConvolution(self.input_feats, self.latent_dim, node_n=48, bias=True)
+        self.motion_input_gcn = GraphConvolution(self.input_feats, self.latent_dim, node_n=50, bias=True)
 
         self.input_process = InputProcess(self.data_rep, self.input_feats+self.gru_emb_dim, self.latent_dim)
         self.input_process_wGCN = InputProcess_wGCN(self.data_rep, self.input_feats+self.gru_emb_dim, self.latent_dim)
@@ -184,7 +184,9 @@ class MDM(nn.Module):
             # print('motion_embed' in y.keys(), "multi-modal input detected")
             enc_motion = y['motion_embed']
             bs, njoints, nfeats, nframes = enc_motion.shape
-            enc_motion = enc_motion.permute((3, 0, 1, 2)).reshape(nframes, bs, njoints*nfeats)
+
+            #reshaping for Linear layer
+            # enc_motion = enc_motion.permute((3, 0, 1, 2)).reshape(nframes, bs, njoints*nfeats)
 
             ##Full input Linear
             # emb_motion = self.motion_input_linear(enc_motion)
@@ -195,10 +197,16 @@ class MDM(nn.Module):
             #     emb_motion_first_10 = self.motion_input_linear(enc_motion[:10, :, :])
             #     x[:10, :, :] += emb_motion_first_10
 
+            #reshaping for GCN layer
+            enc_motion = enc_motion.permute((0, 3, 1, 2)).reshape(bs, nframes, njoints)
+
             ##Partial input GCN
             if enc_motion.shape[0] >= 50 and x.shape[0] >= 50:
-                emb_motion_first_50 = self.motion_input_gcn(enc_motion[:50, :, :])
-                x[:50, :, :] += emb_motion_first_50
+                emb_motion_first_50 = self.motion_input_gcn(enc_motion[:, :50, :]) # [bs, 50, d]
+                x[:, :50, :] += emb_motion_first_50
+            
+            #reshaping after GCN layer
+            x = x.permute((1, 0, 2)) #[seqlen, bs, d]
             
 
         if self.arch == 'trans_enc':
@@ -309,7 +317,7 @@ class InputProcess_wGCN(nn.Module):
         self.data_rep = data_rep
         self.input_feats = input_feats
         self.latent_dim = latent_dim
-        self.poseEmbedding = GraphConvolution(self.input_feats, self.latent_dim)
+        self.poseEmbedding = GraphConvolution(self.input_feats, self.latent_dim, node_n=196, bias=True)
         if self.data_rep == 'rot_vel':
             # self.velEmbedding = nn.Linear(self.input_feats, self.latent_dim)
             raise ValueError # Not implemented yet
@@ -317,17 +325,17 @@ class InputProcess_wGCN(nn.Module):
 
     def forward(self, x):
         bs, njoints, nfeats, nframes = x.shape
-        x = x.permute((3, 0, 1, 2)).reshape(nframes, bs, njoints*nfeats)
+        x = x.permute((0, 3, 1, 2)).reshape(bs, nframes, njoints*nfeats)
 
         if self.data_rep in ['rot6d', 'xyz', 'hml_vec']:
             x = self.poseEmbedding(x)  # [seqlen, bs, d]
             return x
-        elif self.data_rep == 'rot_vel':
-            first_pose = x[[0]]  # [1, bs, 150]
-            first_pose = self.poseEmbedding(first_pose)  # [1, bs, d]
-            vel = x[1:]  # [seqlen-1, bs, 150]
-            vel = self.velEmbedding(vel)  # [seqlen-1, bs, d]
-            return torch.cat((first_pose, vel), axis=0)  # [seqlen, bs, d]
+        # elif self.data_rep == 'rot_vel':
+        #     first_pose = x[[0]]  # [1, bs, 150]
+        #     first_pose = self.poseEmbedding(first_pose)  # [1, bs, d]
+        #     vel = x[1:]  # [seqlen-1, bs, 150]
+        #     vel = self.velEmbedding(vel)  # [seqlen-1, bs, d]
+        #     return torch.cat((first_pose, vel), axis=0)  # [seqlen, bs, d]
         else:
             raise ValueError
 
@@ -371,7 +379,7 @@ class OutputProcess_wGCN(nn.Module):
         self.njoints = njoints
         self.nfeats = nfeats
         # Update: Output layer now has 2 * input_feats to include variance
-        self.poseFinal = GraphConvolution(self.latent_dim, self.input_feats * 2)  # Updated
+        self.poseFinal = GraphConvolution(self.latent_dim, self.input_feats*2, node_n=196, bias=True)
         if self.data_rep == 'rot_vel':
             # self.velFinal = nn.Linear(self.latent_dim, self.input_feats)
             raise ValueError # Not implemented yet
@@ -379,13 +387,15 @@ class OutputProcess_wGCN(nn.Module):
     def forward(self, output):
         nframes, bs, d = output.shape
         if self.data_rep in ['rot6d', 'xyz', 'hml_vec']:
+            output = output.permute(1, 0, 2)  # [bs, seqlen, d]
             output = self.poseFinal(output)
-        elif self.data_rep == 'rot_vel':
-            first_pose = output[[0]]
-            first_pose = self.poseFinal(first_pose)
-            vel = output[1:]
-            vel = self.velFinal(vel)
-            output = torch.cat((first_pose, vel), axis=0)
+            output = output.permute(1, 0, 2)  # [seqlen, bs, d]
+        # elif self.data_rep == 'rot_vel':
+        #     first_pose = output[[0]]
+        #     first_pose = self.poseFinal(first_pose)
+        #     vel = output[1:]
+        #     vel = self.velFinal(vel)
+        #     output = torch.cat((first_pose, vel), axis=0)
         else:
             raise ValueError
         # Update: Reshape to include doubled features for mean and variance
