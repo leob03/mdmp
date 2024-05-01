@@ -73,12 +73,16 @@ def main():
     assert max_frames == input_motions.shape[-1]
     gt_frames_per_sample = {}
     model_kwargs['y']['inpainted_motion'] = input_motions
+    # print(f'Input motion shape: {input_motions.shape}') # [bs, njoints, 1, seqlen]
     if args.edit_mode == 'in_between':
         model_kwargs['y']['inpainting_mask'] = torch.ones_like(input_motions, dtype=torch.bool,
                                                                device=input_motions.device)  # True means use gt motion
         for i, length in enumerate(model_kwargs['y']['lengths'].cpu().numpy()):
+            # print(f'In-between edit for sample {i} with length {length}') # sample: 0-9; length: 120 or 196, ... 
             start_idx, end_idx = int(args.prefix_end * length), int(args.suffix_start * length)
+            # print(f'In-between edit for sample {i} with start_idx {start_idx} and end_idx {end_idx}') # start_idx: 0,25* length; end_idx: 0.75*length
             gt_frames_per_sample[i] = list(range(0, start_idx)) + list(range(end_idx, max_frames))
+            # print(f'In-between edit for sample {i} with gt_frames {gt_frames_per_sample[i]}') # gt_frames: [0:24, 147:195]
             model_kwargs['y']['inpainting_mask'][i, :, :,
             start_idx: end_idx] = False  # do inpainting in those frames
     elif args.edit_mode == 'upper_body':

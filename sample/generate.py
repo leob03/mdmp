@@ -200,7 +200,7 @@ def main():
             save_file = sample_file_template.format(sample_i, rep_i)
             print(sample_print_template.format(caption, sample_i, rep_i, save_file))
             animation_save_path = os.path.join(out_path, save_file)
-            plot_3d_motion(animation_save_path, skeleton, motion, variance, dataset=args.dataset, title=caption, fps=fps) #modify plot_3d_motion to include variance
+            plot_3d_motion(animation_save_path, skeleton, motion, variance=variance, dataset=args.dataset, title=caption, fps=fps) #modify plot_3d_motion to include variance
             
             rep_files.append(animation_save_path)
 

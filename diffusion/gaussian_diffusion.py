@@ -555,8 +555,10 @@ class GaussianDiffusion:
         # print('nonzero_mask', nonzero_mask.shape, nonzero_mask)
         # torch.Size([10, 1, 1, 1])
         sample = out["mean"] + nonzero_mask * th.exp(0.5 * out["log_variance"]) * noise
-        #keep track of the mean and variance
+        return {"sample": sample, "pred_xstart": out["pred_xstart"]}
+        #keep track of the mean AND variance
         return {"sample": sample, "pred_xstart": out["pred_xstart"], "log_variance": out["log_variance"]}
+
 
     def p_sample_with_grad(
         self,
@@ -606,6 +608,8 @@ class GaussianDiffusion:
         # print('mean', out["mean"].shape)
         # print('log_variance', out["log_variance"].shape)
         sample = out["mean"] + nonzero_mask * th.exp(0.5 * out["log_variance"]) * noise
+        return {"sample": sample, "pred_xstart": out["pred_xstart"].detach()}
+        #keep track of the mean AND variance
         return {"sample": sample, "pred_xstart": out["pred_xstart"].detach(), "log_variance": out["log_variance"]}
 
     def p_sample_loop(
@@ -675,6 +679,8 @@ class GaussianDiffusion:
             final = sample
         if dump_steps is not None:
             return dump
+        return final["sample"]
+        #keep track of the mean AND variance
         return final["sample"], final["log_variance"]
 
     def p_sample_loop_progressive(

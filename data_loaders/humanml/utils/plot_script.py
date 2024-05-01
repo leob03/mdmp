@@ -28,7 +28,7 @@ def list_cut_average(ll, intervals):
     return ll_new
 
 
-def plot_3d_motion(save_path, kinematic_tree, joints, variance, title, dataset, figsize=(3, 3), fps=120, radius=3,
+def plot_3d_motion(save_path, kinematic_tree, joints, title, dataset, variance = None, figsize=(3, 3), fps=120, radius=3,
                    vis_mode='default', gt_frames=[]):
     matplotlib.use('Agg')
 
@@ -136,12 +136,13 @@ def plot_3d_motion(save_path, kinematic_tree, joints, variance, title, dataset, 
         specific_joints_indices = [3, 7, 8, 12, 20, 21]
 
         # Draw spheres around specific joints
-        for joint_idx in specific_joints_indices:
-            joint_position = data[index, joint_idx]
-            # joint_variance = np.exp(np.mean(variance[index, joint_idx]))  # Convert log variance to actual variance
-            joint_variance = np.exp(np.mean(variance[index, joint_idx])) * 0.3
-            radius = np.sqrt(joint_variance) / 3  # Simplified radius calculation
-            draw_sphere(joint_position, radius, color='c', alpha=0.1)
+        if variance is not None:
+            for joint_idx in specific_joints_indices:
+                joint_position = data[index, joint_idx]
+                # joint_variance = np.exp(np.mean(variance[index, joint_idx]))  # Convert log variance to actual variance
+                joint_variance = np.exp(np.mean(variance[index, joint_idx])) * 0.3
+                radius = np.sqrt(joint_variance) / 3  # Simplified radius calculation
+                draw_sphere(joint_position, radius, color='c', alpha=0.1)
 
     ani = FuncAnimation(fig, update, frames=frame_number, interval=1000 / fps, repeat=False)
 
@@ -153,7 +154,7 @@ def plot_3d_motion(save_path, kinematic_tree, joints, variance, title, dataset, 
     plt.close()
 
 
-def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, variance, title, dataset, gt_data=None, figsize=(3, 3), fps=120, radius=3,
+def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, variance = None, gt_data=None, figsize=(3, 3), fps=120, radius=3,
                    vis_mode='default', gt_frames=[]):
     matplotlib.use('Agg')
 
@@ -264,8 +265,12 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, variance, title, d
             else:
                 raise ValueError(f"gt_motion of index {index} can't be reshaped to a 2D array of shape [-1, 3]")
 
-            for chain in kinematic_tree:
-                ax.plot3D(gt_motion[chain, 0], gt_motion[chain, 1], gt_motion[chain, 2], linewidth=2.0, color="#4D84AA")
+            for i, (chain, color) in enumerate(zip(kinematic_tree, colors_blue)):
+                if i < 5:
+                    linewidth = 4.0
+                else:
+                    linewidth = 2.0
+                ax.plot3D(gt_motion[chain, 0], gt_motion[chain, 1], gt_motion[chain, 2], linewidth=linewidth, color=color)
         
 
         plt.axis('off')
@@ -276,12 +281,13 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, variance, title, d
         specific_joints_indices = [3, 7, 8, 12, 20, 21]
 
         # Draw spheres around specific joints
-        for joint_idx in specific_joints_indices:
-            joint_position = data[index, joint_idx]
-            # joint_variance = np.exp(np.mean(variance[index, joint_idx]))  # Convert log variance to actual variance
-            joint_variance = np.exp(np.mean(variance[index, joint_idx])) * 0.3
-            radius = np.sqrt(joint_variance) / 3  # Simplified radius calculation
-            draw_sphere(joint_position, radius, color='c', alpha=0.1)
+        if variance is not None:
+            for joint_idx in specific_joints_indices:
+                joint_position = data[index, joint_idx]
+                # joint_variance = np.exp(np.mean(variance[index, joint_idx]))  # Convert log variance to actual variance
+                joint_variance = np.exp(np.mean(variance[index, joint_idx])) * 0.3
+                radius = np.sqrt(joint_variance) / 3  # Simplified radius calculation
+                draw_sphere(joint_position, radius, color='c', alpha=0.1)
 
     ani = FuncAnimation(fig, update, frames=frame_number, interval=1000 / fps, repeat=False)
 
