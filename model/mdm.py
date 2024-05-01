@@ -175,10 +175,10 @@ class MDM(nn.Module):
             x = torch.cat((x_reshaped, emb_gru), axis=1)  #[bs, d+joints*feat, 1, #frames]
 
         # Linear Input Processing
-        x = self.input_process(x) # [seqlen, bs, d]
+        # x = self.input_process(x) # [seqlen, bs, d]
 
         # GCN Input Processing
-        # x = self.input_process_wGCN(x) # [seqlen, bs, d]
+        x = self.input_process_wGCN(x) # [seqlen, bs, d]
 
         if 'motion_embed' in y.keys():  # caching option
             # print('motion_embed' in y.keys(), "multi-modal input detected")
@@ -206,7 +206,7 @@ class MDM(nn.Module):
                 x[:, :50, :] += emb_motion_first_50
             
         #reshaping after GCN layer
-        # x = x.permute((1, 0, 2)) #[seqlen, bs, d]
+        x = x.permute((1, 0, 2)) #[seqlen, bs, d]
             
 
         if self.arch == 'trans_enc':
@@ -231,10 +231,10 @@ class MDM(nn.Module):
             output, _ = self.gru(xseq)
 
         # Linear Output Processing
-        output = self.output_process(output)  # [bs, njoints, nfeats, nframes]
+        # output = self.output_process(output)  # [bs, njoints, nfeats, nframes]
 
         # GCN Output Processing
-        # output = self.output_process_wGCN(output)  # [bs, njoints, nfeats, nframes]
+        output = self.output_process_wGCN(output)  # [bs, njoints, nfeats, nframes]
         return output
 
 
@@ -348,9 +348,9 @@ class OutputProcess(nn.Module):
         self.latent_dim = latent_dim
         self.njoints = njoints
         self.nfeats = nfeats
-        self.poseFinal = nn.Linear(self.latent_dim, self.input_feats)
+        # self.poseFinal = nn.Linear(self.latent_dim, self.input_feats)
         # Update: Output layer now has 2 * input_feats to include variance
-        # self.poseFinal = nn.Linear(self.latent_dim, self.input_feats * 2)  # Updated
+        self.poseFinal = nn.Linear(self.latent_dim, self.input_feats * 2)  # Updated
         if self.data_rep == 'rot_vel':
             self.velFinal = nn.Linear(self.latent_dim, self.input_feats)
 
@@ -366,9 +366,9 @@ class OutputProcess(nn.Module):
             output = torch.cat((first_pose, vel), axis=0)
         else:
             raise ValueError
-        output = output.reshape(nframes, bs, self.njoints, self.nfeats)
+        # output = output.reshape(nframes, bs, self.njoints, self.nfeats)
         # Update: Reshape to include doubled features for mean and variance
-        # output = output.reshape(nframes, bs, 2 * self.njoints, self.nfeats)  # Updated
+        output = output.reshape(nframes, bs, 2 * self.njoints, self.nfeats)  # Updated
         output = output.permute(1, 2, 3, 0)  # [bs, 2 *njoints, nfeats, nframes] Updated
         return output
 

@@ -555,7 +555,7 @@ class GaussianDiffusion:
         # print('nonzero_mask', nonzero_mask.shape, nonzero_mask)
         # torch.Size([10, 1, 1, 1])
         sample = out["mean"] + nonzero_mask * th.exp(0.5 * out["log_variance"]) * noise
-        return {"sample": sample, "pred_xstart": out["pred_xstart"]}
+        # return {"sample": sample, "pred_xstart": out["pred_xstart"]}
         #keep track of the mean AND variance
         return {"sample": sample, "pred_xstart": out["pred_xstart"], "log_variance": out["log_variance"]}
 
@@ -608,7 +608,7 @@ class GaussianDiffusion:
         # print('mean', out["mean"].shape)
         # print('log_variance', out["log_variance"].shape)
         sample = out["mean"] + nonzero_mask * th.exp(0.5 * out["log_variance"]) * noise
-        return {"sample": sample, "pred_xstart": out["pred_xstart"].detach()}
+        # return {"sample": sample, "pred_xstart": out["pred_xstart"].detach()}
         #keep track of the mean AND variance
         return {"sample": sample, "pred_xstart": out["pred_xstart"].detach(), "log_variance": out["log_variance"]}
 
@@ -679,7 +679,7 @@ class GaussianDiffusion:
             final = sample
         if dump_steps is not None:
             return dump
-        return final["sample"]
+        # return final["sample"]
         #keep track of the mean AND variance
         return final["sample"], final["log_variance"]
 
