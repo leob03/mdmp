@@ -304,37 +304,47 @@ class GaussianDiffusion:
         assert t.shape == (B,)
         model_output = model(x, self._scale_timesteps(t), **model_kwargs)
 
-        # print(model_kwargs)
         if 'inpainting_mask' in model_kwargs['y'].keys() and 'inpainted_motion' in model_kwargs['y'].keys():
             inpainting_mask, inpainted_motion = model_kwargs['y']['inpainting_mask'], model_kwargs['y']['inpainted_motion']
             assert self.model_mean_type == ModelMeanType.START_X, 'This feature supports only X_start pred for now!'
+
+            if self.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
+                # Ensure split is performed first if both conditions are met
+                assert model_output.shape == (B, C * 2, *x.shape[2:])
+                model_output, model_var_values = th.split(model_output, C, dim=1)
+
+                # Handle variance computation for the LEARNED case
+                if self.model_var_type == ModelVarType.LEARNED:
+                    model_log_variance = model_var_values
+                    model_variance = th.exp(model_log_variance)
+                else:
+                    min_log = _extract_into_tensor(self.posterior_log_variance_clipped, t, x.shape)
+                    max_log = _extract_into_tensor(np.log(self.betas), t, x.shape)
+                    frac = (model_var_values + 1) / 2
+                    model_log_variance = frac * max_log + (1 - frac) * min_log
+                    model_variance = th.exp(model_log_variance)
+
+            # Once split is handled, we can perform the inpainting operation
             assert model_output.shape == inpainting_mask.shape == inpainted_motion.shape
             model_output = (model_output * ~inpainting_mask) + (inpainted_motion * inpainting_mask)
-            # print('model_output', model_output.shape, model_output)
-            # print('inpainting_mask', inpainting_mask.shape, inpainting_mask[0,0,0,:])
-            # print('inpainted_motion', inpainted_motion.shape, inpainted_motion)
 
-        if self.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
-            # print('model_output', model_output.shape, model_output)
-            # print(B, C * 2, x.shape[2:])
+        elif self.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
+            # Handle cases when only model_var_type check is met
             assert model_output.shape == (B, C * 2, *x.shape[2:])
             model_output, model_var_values = th.split(model_output, C, dim=1)
+
             if self.model_var_type == ModelVarType.LEARNED:
                 model_log_variance = model_var_values
                 model_variance = th.exp(model_log_variance)
             else:
-                min_log = _extract_into_tensor(
-                    self.posterior_log_variance_clipped, t, x.shape
-                )
+                min_log = _extract_into_tensor(self.posterior_log_variance_clipped, t, x.shape)
                 max_log = _extract_into_tensor(np.log(self.betas), t, x.shape)
-                # The model_var_values is [-1, 1] for [min_var, max_var].
                 frac = (model_var_values + 1) / 2
                 model_log_variance = frac * max_log + (1 - frac) * min_log
                 model_variance = th.exp(model_log_variance)
         else:
+            # Handle other var types if neither condition is met
             model_variance, model_log_variance = {
-                # for fixedlarge, we set the initial (log-)variance like so
-                # to get a better decoder log likelihood.
                 ModelVarType.FIXED_LARGE: (
                     np.append(self.posterior_variance[1], self.betas[1:]),
                     np.log(np.append(self.posterior_variance[1], self.betas[1:])),
@@ -344,12 +354,6 @@ class GaussianDiffusion:
                     self.posterior_log_variance_clipped,
                 ),
             }[self.model_var_type]
-            # print('model_variance', model_variance)
-            # print('model_log_variance',model_log_variance)
-            # print('self.posterior_variance', self.posterior_variance)
-            # print('self.posterior_log_variance_clipped', self.posterior_log_variance_clipped)
-            # print('self.model_var_type', self.model_var_type)
-
 
             model_variance = _extract_into_tensor(model_variance, t, x.shape)
             model_log_variance = _extract_into_tensor(model_log_variance, t, x.shape)
@@ -555,9 +559,11 @@ class GaussianDiffusion:
         # print('nonzero_mask', nonzero_mask.shape, nonzero_mask)
         # torch.Size([10, 1, 1, 1])
         sample = out["mean"] + nonzero_mask * th.exp(0.5 * out["log_variance"]) * noise
-        # return {"sample": sample, "pred_xstart": out["pred_xstart"]}
-        #keep track of the mean AND variance
-        return {"sample": sample, "pred_xstart": out["pred_xstart"], "log_variance": out["log_variance"]}
+        if self.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
+            #keep track of the mean AND variance
+            return {"sample": sample, "pred_xstart": out["pred_xstart"], "log_variance": out["log_variance"]}
+        else:
+            return {"sample": sample, "pred_xstart": out["pred_xstart"]}
 
 
     def p_sample_with_grad(
@@ -608,9 +614,11 @@ class GaussianDiffusion:
         # print('mean', out["mean"].shape)
         # print('log_variance', out["log_variance"].shape)
         sample = out["mean"] + nonzero_mask * th.exp(0.5 * out["log_variance"]) * noise
-        # return {"sample": sample, "pred_xstart": out["pred_xstart"].detach()}
-        #keep track of the mean AND variance
-        return {"sample": sample, "pred_xstart": out["pred_xstart"].detach(), "log_variance": out["log_variance"]}
+        if self.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
+            #keep track of the mean AND variance
+            return {"sample": sample, "pred_xstart": out["pred_xstart"].detach(), "log_variance": out["log_variance"]}
+        else:
+            return {"sample": sample, "pred_xstart": out["pred_xstart"].detach()}
 
     def p_sample_loop(
         self,
@@ -679,9 +687,11 @@ class GaussianDiffusion:
             final = sample
         if dump_steps is not None:
             return dump
-        # return final["sample"]
-        #keep track of the mean AND variance
-        return final["sample"], final["log_variance"]
+        if self.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
+            #keep track of the mean AND variance
+            return final["sample"], final["log_variance"]
+        else:
+            return final["sample"]
 
     def p_sample_loop_progressive(
         self,

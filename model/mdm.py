@@ -175,10 +175,10 @@ class MDM(nn.Module):
             x = torch.cat((x_reshaped, emb_gru), axis=1)  #[bs, d+joints*feat, 1, #frames]
 
         # Linear Input Processing
-        # x = self.input_process(x) # [seqlen, bs, d]
+        x = self.input_process(x) # [seqlen, bs, d]
 
         # GCN Input Processing
-        x = self.input_process_wGCN(x) # [seqlen, bs, d]
+        # x = self.input_process_wGCN(x) # [seqlen, bs, d]
 
         if 'motion_embed' in y.keys():  # caching option
             # print('motion_embed' in y.keys(), "multi-modal input detected")
@@ -206,7 +206,7 @@ class MDM(nn.Module):
                 x[:, :50, :] += emb_motion_first_50
             
         #reshaping after GCN layer
-        x = x.permute((1, 0, 2)) #[seqlen, bs, d]
+        # x = x.permute((1, 0, 2)) #[seqlen, bs, d]
             
 
         if self.arch == 'trans_enc':
@@ -231,10 +231,10 @@ class MDM(nn.Module):
             output, _ = self.gru(xseq)
 
         # Linear Output Processing
-        # output = self.output_process(output)  # [bs, njoints, nfeats, nframes]
+        output = self.output_process(output)  # [bs, njoints, nfeats, nframes]
 
         # GCN Output Processing
-        output = self.output_process_wGCN(output)  # [bs, njoints, nfeats, nframes]
+        # output = self.output_process_wGCN(output)  # [bs, njoints, nfeats, nframes]
         return output
 
 

@@ -112,19 +112,34 @@ def main():
 
         sample_fn = diffusion.p_sample_loop
 
-        sample, log_variance = sample_fn(
-            model,
-            # (args.batch_size, model.njoints, model.nfeats, n_frames),  # BUG FIX - this one caused a mismatch between training and inference
-            (args.batch_size, model.njoints, model.nfeats, max_frames),  # BUG FIX
-            clip_denoised=False,
-            model_kwargs=model_kwargs,
-            skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
-            init_image=None,
-            progress=True,
-            dump_steps=None,
-            noise=None,
-            const_noise=False,
-        )
+        if args.learning_var:
+            sample, log_variance = sample_fn(
+                model,
+                # (args.batch_size, model.njoints, model.nfeats, n_frames),  # BUG FIX - this one caused a mismatch between training and inference
+                (args.batch_size, model.njoints, model.nfeats, max_frames),  # BUG FIX
+                clip_denoised=False,
+                model_kwargs=model_kwargs,
+                skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
+                init_image=None,
+                progress=True,
+                dump_steps=None,
+                noise=None,
+                const_noise=False,
+            )
+        else:
+            sample = sample_fn(
+                model,
+                # (args.batch_size, model.njoints, model.nfeats, n_frames),  # BUG FIX - this one caused a mismatch between training and inference
+                (args.batch_size, model.njoints, model.nfeats, max_frames),  # BUG FIX
+                clip_denoised=False,
+                model_kwargs=model_kwargs,
+                skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
+                init_image=None,
+                progress=True,
+                dump_steps=None,
+                noise=None,
+                const_noise=False,
+            )
 
         # print(f"sample shape: {sample.shape}") # [10, 263, 1, 196]
         # print(f"log_variance shape: {log_variance.shape}") # [10, 263, 1, 196]
@@ -132,20 +147,22 @@ def main():
         if model.data_rep == 'hml_vec':
             n_joints = 22 if sample.shape[1] == 263 else 21
             sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float()
-            log_variance = data.dataset.t2m_dataset.inv_transform(log_variance.cpu().permute(0, 2, 3, 1)).float()
             sample = recover_from_ric(sample, n_joints)
-            log_variance = recover_from_ric(log_variance, n_joints)
             sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1)
-            log_variance = log_variance.view(-1, *log_variance.shape[2:]).permute(0, 2, 3, 1)
+            if args.learning_var:
+                log_variance = data.dataset.t2m_dataset.inv_transform(log_variance.cpu().permute(0, 2, 3, 1)).float()
+                log_variance = recover_from_ric(log_variance, n_joints)
+                log_variance = log_variance.view(-1, *log_variance.shape[2:]).permute(0, 2, 3, 1)
 
         rot2xyz_pose_rep = 'xyz' if model.data_rep in ['xyz', 'hml_vec'] else model.data_rep
         rot2xyz_mask = None if rot2xyz_pose_rep == 'xyz' else model_kwargs['y']['mask'].reshape(args.batch_size, n_frames).bool()
         sample = model.rot2xyz(x=sample, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
                                jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
                                get_rotations_back=False)
-        # log_variance = model.rot2xyz(x=log_variance, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
-        #                              jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
-        #                              get_rotations_back=False)
+        if args.learning_var:
+            log_variance = model.rot2xyz(x=log_variance, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
+                                        jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
+                                        get_rotations_back=False)
 
         if args.unconstrained:
             all_text += ['unconstrained'] * args.num_samples
@@ -154,18 +171,20 @@ def main():
             all_text += model_kwargs['y'][text_key]
 
         all_motions.append(sample.cpu().numpy())
-        all_variances.append(log_variance.cpu().numpy())
         all_lengths.append(model_kwargs['y']['lengths'].cpu().numpy())
+        if args.learning_var:
+            all_variances.append(log_variance.cpu().numpy())
 
         print(f"created {len(all_motions) * args.batch_size} samples")
 
 
     all_motions = np.concatenate(all_motions, axis=0)
-    all_variances = np.concatenate(all_variances, axis=0)
     all_motions = all_motions[:total_num_samples]  # [bs, njoints, 6, seqlen]
-    all_variances = all_variances[:total_num_samples]
     all_text = all_text[:total_num_samples]
     all_lengths = np.concatenate(all_lengths, axis=0)[:total_num_samples]
+    if args.learning_var:
+        all_variances = np.concatenate(all_variances, axis=0)
+        all_variances = all_variances[:total_num_samples]
 
     if os.path.exists(out_path):
         shutil.rmtree(out_path)
@@ -173,8 +192,13 @@ def main():
 
     npy_path = os.path.join(out_path, 'results.npy')
     print(f"saving results file to [{npy_path}]")
-    np.save(npy_path,
+    if args.learning_var:
+        np.save(npy_path,
             {'motion': all_motions, 'variances': all_variances, 'text': all_text, 'lengths': all_lengths,
+             'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
+    else:
+        np.save(npy_path,
+            {'motion': all_motions, 'text': all_text, 'lengths': all_lengths,
              'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
     with open(npy_path.replace('.npy', '.txt'), 'w') as fw:
         fw.write('\n'.join(all_text))
@@ -196,12 +220,16 @@ def main():
             caption = all_text[rep_i*args.batch_size + sample_i]
             length = all_lengths[rep_i*args.batch_size + sample_i]
             motion = all_motions[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
-            variance = all_variances[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
+            if args.learning_var:
+                variance = all_variances[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
             save_file = sample_file_template.format(sample_i, rep_i)
             print(sample_print_template.format(caption, sample_i, rep_i, save_file))
             animation_save_path = os.path.join(out_path, save_file)
-            plot_3d_motion(animation_save_path, skeleton, motion, variance=variance, dataset=args.dataset, title=caption, fps=fps) #modify plot_3d_motion to include variance
-            
+            if args.learning_var:
+                plot_3d_motion(animation_save_path, skeleton, motion, variance=variance, dataset=args.dataset, title=caption, fps=fps) #modified plot_3d_motion to include variance
+            else:
+                plot_3d_motion(animation_save_path, skeleton, motion, dataset=args.dataset, title=caption, fps=fps)
+
             rep_files.append(animation_save_path)
 
         sample_files = save_multiple_samples(args, out_path,
