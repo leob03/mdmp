@@ -46,16 +46,15 @@ def get_model_args(args, data):
             'latent_dim': args.latent_dim, 'ff_size': 1024, 'num_layers': args.layers, 'num_heads': 4,
             'dropout': 0.1, 'activation': "gelu", 'data_rep': data_rep, 'cond_mode': cond_mode,
             'cond_mask_prob': args.cond_mask_prob, 'action_emb': action_emb, 'arch': args.arch,
-            'emb_trans_dec': args.emb_trans_dec, 'clip_version': clip_version, 'dataset': args.dataset}
+            'use_gcn': args.use_gcn, 'emb_trans_dec': args.emb_trans_dec, 'clip_version': clip_version, 'dataset': args.dataset, 'learning_var': args.learning_var}
 
-#with learning var
 def create_gaussian_diffusion(args):
     # default params
     predict_xstart = True  # we always predict x_start (a.k.a. x0), that's our deal!
     steps = args.diffusion_steps
     scale_beta = 1.  # no scaling
     timestep_respacing = ''  # can be used for ddim sampling, we don't use it.
-    learn_sigma = True
+    learn_sigma = args.learning_var
     rescale_timesteps = False
 
     betas = gd.get_named_beta_schedule(args.noise_schedule, steps, scale_beta)
@@ -81,7 +80,6 @@ def create_gaussian_diffusion(args):
         lambda_fc=args.lambda_fc,
     )
 
-#without learning var
 # def create_gaussian_diffusion(args):
 #     # default params
 #     predict_xstart = True  # we always predict x_start (a.k.a. x0), that's our deal!

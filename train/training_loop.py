@@ -245,6 +245,9 @@ class TrainLoop:
             # print("micro", micro.shape)
             micro_cond = cond
             micro_cond['y']['motion_embed'] = batch
+            micro_cond['y']['motion_embed_mask'] = torch.ones_like(batch, dtype=torch.bool, device=batch.device)
+            start_idx = self.args.emb_motion_len
+            micro_cond['y']['motion_embed_mask'][:, :, :, start_idx:] = False
             # print("micro_cond", micro_cond)
             last_batch = (i + self.microbatch) >= batch.shape[0]
             t, weights = self.schedule_sampler.sample(micro.shape[0], dist_util.dev())

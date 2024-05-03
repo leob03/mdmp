@@ -77,12 +77,12 @@ def calculate_diversity(activation, diversity_times):
 
     first_indices = np.random.choice(num_samples, diversity_times, replace=False)
     second_indices = np.random.choice(num_samples, diversity_times, replace=False)
-    if np.any(np.isnan(first_indices)):
-            print("first_indices contains NaNs or Infs")
-    if np.any(np.isnan(second_indices)):
-            print("second_indices contains NaNs or Infs")
-    first_indices = np.nan_to_num(first_indices, nan=0.0, posinf=0.0, neginf=0.0)
-    second_indices = np.nan_to_num(second_indices, nan=0.0, posinf=0.0, neginf=0.0)
+    # if np.any(np.isnan(first_indices)):
+    #         print("first_indices contains NaNs or Infs")
+    # if np.any(np.isnan(second_indices)):
+    #         print("second_indices contains NaNs or Infs")
+    # first_indices = np.nan_to_num(first_indices, nan=0.0, posinf=0.0, neginf=0.0)
+    # second_indices = np.nan_to_num(second_indices, nan=0.0, posinf=0.0, neginf=0.0)
     dist = linalg.norm(activation[first_indices] - activation[second_indices], axis=1)
     return dist.mean()
 

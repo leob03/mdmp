@@ -1,10 +1,24 @@
 import torch
+import enum
 from data_loaders.humanml.networks.modules import *
 from data_loaders.humanml.networks.trainers import CompTrainerV6
 from torch.utils.data import Dataset, DataLoader
 from os.path import join as pjoin
 from tqdm import tqdm
 from utils import dist_util
+
+class ModelVarType(enum.Enum):
+    """
+    What is used as the model's output variance.
+
+    The LEARNED_RANGE option has been added to allow the model to predict
+    values between FIXED_SMALL and FIXED_LARGE, making its job easier.
+    """
+
+    LEARNED = enum.auto()
+    FIXED_SMALL = enum.auto()
+    FIXED_LARGE = enum.auto()
+    LEARNED_RANGE = enum.auto()
 
 def build_models(opt):
     if opt.text_enc_mod == 'bigru':
@@ -192,19 +206,34 @@ class CompMDMGeneratedDataset(Dataset):
                 mm_motions = []
                 for t in range(repeat_times):
 
-                    sample, log_variance = sample_fn(
-                        model=model,
-                        shape=motion.shape,
-                        clip_denoised=clip_denoised,
-                        model_kwargs=model_kwargs,
-                        skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
-                        init_image=None,
-                        progress=False,
-                        dump_steps=None,
-                        noise=None,
-                        const_noise=False,
-                        # when experimenting guidance_scale we want to nutrileze the effect of noise on generation
-                    )
+                    if diffusion.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
+                        sample, log_variance = sample_fn(
+                            model=model,
+                            shape=motion.shape,
+                            clip_denoised=clip_denoised,
+                            model_kwargs=model_kwargs,
+                            skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
+                            init_image=None,
+                            progress=False,
+                            dump_steps=None,
+                            noise=None,
+                            const_noise=False,
+                            # when experimenting guidance_scale we want to nutrileze the effect of noise on generation
+                        )
+                    else:
+                        sample = sample_fn(
+                            model=model,
+                            shape=motion.shape,
+                            clip_denoised=clip_denoised,
+                            model_kwargs=model_kwargs,
+                            skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
+                            init_image=None,
+                            progress=False,
+                            dump_steps=None,
+                            noise=None,
+                            const_noise=False,
+                            # when experimenting guidance_scale we want to nutrileze the effect of noise on generation
+                        )
 
                     if t == 0:
                         sub_dicts = [{

@@ -12,7 +12,7 @@ class MDM(nn.Module):
     def __init__(self, modeltype, njoints, nfeats, num_actions, translation, pose_rep, glob, glob_rot,
                  latent_dim=256, ff_size=1024, num_layers=8, num_heads=4, dropout=0.1,
                  ablation=None, activation="gelu", legacy=False, data_rep='rot6d', dataset='amass', clip_dim=512,
-                 arch='trans_enc', emb_trans_dec=False, clip_version=None, **kargs):
+                 arch='trans_enc', use_gcn=True, emb_trans_dec=False, clip_version=None, learning_var=True, **kargs):
         super().__init__()
 
         self.legacy = legacy
@@ -22,6 +22,7 @@ class MDM(nn.Module):
         self.num_actions = num_actions
         self.data_rep = data_rep
         self.dataset = dataset
+        self.learning_var = learning_var
 
         self.pose_rep = pose_rep
         self.glob = glob
@@ -47,14 +48,16 @@ class MDM(nn.Module):
         self.cond_mode = kargs.get('cond_mode', 'no_cond')
         self.cond_mask_prob = kargs.get('cond_mask_prob', 0.)
         self.arch = arch
+        self.use_gcn = use_gcn  # whether to use GCN for input and output processing
         self.gru_emb_dim = self.latent_dim if self.arch == 'gru' else 0
 
         self.motion_input_linear = nn.Linear(self.input_feats, self.latent_dim)
 
-        self.motion_input_gcn = GraphConvolution(self.input_feats, self.latent_dim, node_n=50, bias=True)
-
-        self.input_process = InputProcess(self.data_rep, self.input_feats+self.gru_emb_dim, self.latent_dim)
-        self.input_process_wGCN = InputProcess_wGCN(self.data_rep, self.input_feats+self.gru_emb_dim, self.latent_dim)
+        # self.motion_input_gcn = GraphConvolution(self.input_feats, self.latent_dim, node_n=50, bias=True)
+        if not self.use_gcn:
+            self.input_process = InputProcess(self.data_rep, self.input_feats+self.gru_emb_dim, self.latent_dim)
+        else:
+            self.input_process = InputProcess_wGCN(self.data_rep, self.input_feats+self.gru_emb_dim, self.latent_dim)
 
         self.sequence_pos_encoder = PositionalEncoding(self.latent_dim, self.dropout)
         self.emb_trans_dec = emb_trans_dec
@@ -97,10 +100,12 @@ class MDM(nn.Module):
                 self.embed_action = EmbedAction(self.num_actions, self.latent_dim)
                 print('EMBED ACTION')
 
-        self.output_process = OutputProcess(self.data_rep, self.input_feats, self.latent_dim, self.njoints,
-                                            self.nfeats)
-        self.output_process_wGCN = OutputProcess_wGCN(self.data_rep, self.input_feats, self.latent_dim, self.njoints,
-                                            self.nfeats)
+        if not self.use_gcn:
+            self.output_process = OutputProcess(self.data_rep, self.input_feats, self.latent_dim, self.njoints,
+                                            self.nfeats, self.learning_var)
+        else:
+            self.output_process = OutputProcess_wGCN(self.data_rep, self.input_feats, self.latent_dim, self.njoints,
+                                            self.nfeats, self.learning_var)
 
         self.rot2xyz = Rotation2xyz(device='cpu', dataset=self.dataset)
 
@@ -175,15 +180,20 @@ class MDM(nn.Module):
             x = torch.cat((x_reshaped, emb_gru), axis=1)  #[bs, d+joints*feat, 1, #frames]
 
         # Linear Input Processing
-        x = self.input_process(x) # [seqlen, bs, d]
+        # x = self.input_process(x) # [seqlen, bs, d]
 
         # GCN Input Processing
-        # x = self.input_process_wGCN(x) # [seqlen, bs, d]
+        # x = self.input_process_wGCN(x) # [bs, seqlen, d]
 
-        if 'motion_embed' in y.keys():  # caching option
+        if 'motion_embed' in y.keys() and 'motion_embed_mask' in y.keys():
             # print('motion_embed' in y.keys(), "multi-modal input detected")
-            enc_motion = y['motion_embed']
-            bs, njoints, nfeats, nframes = enc_motion.shape
+
+            motion_embed, motion_embed_mask = y['motion_embed'], y['motion_embed_mask']
+            assert x.shape == motion_embed.shape == motion_embed_mask.shape
+            x = (x * ~motion_embed_mask) + (motion_embed * motion_embed_mask)
+
+            # enc_motion = y['motion_embed']
+            # bs, njoints, nfeats, nframes = enc_motion.shape
 
             #reshaping for Linear layer
             # enc_motion = enc_motion.permute((3, 0, 1, 2)).reshape(nframes, bs, njoints*nfeats)
@@ -198,16 +208,22 @@ class MDM(nn.Module):
             #     x[:10, :, :] += emb_motion_first_10
 
             #reshaping for GCN layer
-            enc_motion = enc_motion.permute((0, 3, 1, 2)).reshape(bs, nframes, njoints)
+            # enc_motion = enc_motion.permute((0, 3, 1, 2)).reshape(bs, nframes, njoints)
 
             ##Partial input GCN
-            if enc_motion.shape[0] >= 50 and x.shape[0] >= 50:
-                emb_motion_first_50 = self.motion_input_gcn(enc_motion[:, :50, :]) # [bs, 50, d]
-                x[:, :50, :] += emb_motion_first_50
+            # if enc_motion.shape[0] >= 50 and x.shape[0] >= 50:
+            #     emb_motion_first_50 = self.motion_input_gcn(enc_motion[:, :50, :]) # [bs, 50, d]
+            #     x[:, :50, :] += emb_motion_first_50 # [bs, seqlen, d]
             
         #reshaping after GCN layer
         # x = x.permute((1, 0, 2)) #[seqlen, bs, d]
-            
+                
+        # Linear Input Processing
+        # x = self.input_process(x) # [seqlen, bs, d]
+
+        # GCN Input Processing
+        x = self.input_process(x) # [bs, seqlen, d]
+
 
         if self.arch == 'trans_enc':
             # adding the timestep embed
@@ -230,11 +246,7 @@ class MDM(nn.Module):
             xseq = self.sequence_pos_encoder(xseq)  # [seqlen, bs, d]
             output, _ = self.gru(xseq)
 
-        # Linear Output Processing
         output = self.output_process(output)  # [bs, njoints, nfeats, nframes]
-
-        # GCN Output Processing
-        # output = self.output_process_wGCN(output)  # [bs, njoints, nfeats, nframes]
         return output
 
 
@@ -329,7 +341,7 @@ class InputProcess_wGCN(nn.Module):
 
         if self.data_rep in ['rot6d', 'xyz', 'hml_vec']:
             x = self.poseEmbedding(x)  # [seqlen, bs, d]
-            return x
+            return x.permute((1, 0, 2))
         # elif self.data_rep == 'rot_vel':
         #     first_pose = x[[0]]  # [1, bs, 150]
         #     first_pose = self.poseEmbedding(first_pose)  # [1, bs, d]
@@ -341,16 +353,18 @@ class InputProcess_wGCN(nn.Module):
 
 
 class OutputProcess(nn.Module):
-    def __init__(self, data_rep, input_feats, latent_dim, njoints, nfeats):
+    def __init__(self, data_rep, input_feats, latent_dim, njoints, nfeats, learning_var):
         super().__init__()
         self.data_rep = data_rep
         self.input_feats = input_feats
         self.latent_dim = latent_dim
         self.njoints = njoints
         self.nfeats = nfeats
-        # self.poseFinal = nn.Linear(self.latent_dim, self.input_feats)
-        # Update: Output layer now has 2 * input_feats to include variance
-        self.poseFinal = nn.Linear(self.latent_dim, self.input_feats * 2)  # Updated
+        self.learning_var = learning_var
+        if self.learning_var:
+            self.poseFinal = nn.Linear(self.latent_dim, self.input_feats * 2) # Updated
+        else:
+            self.poseFinal = nn.Linear(self.latent_dim, self.input_feats)
         if self.data_rep == 'rot_vel':
             self.velFinal = nn.Linear(self.latent_dim, self.input_feats)
 
@@ -366,22 +380,27 @@ class OutputProcess(nn.Module):
             output = torch.cat((first_pose, vel), axis=0)
         else:
             raise ValueError
-        # output = output.reshape(nframes, bs, self.njoints, self.nfeats)
-        # Update: Reshape to include doubled features for mean and variance
-        output = output.reshape(nframes, bs, 2 * self.njoints, self.nfeats)  # Updated
-        output = output.permute(1, 2, 3, 0)  # [bs, 2 *njoints, nfeats, nframes] Updated
+        if self.learning_var:
+            output = output.reshape(nframes, bs, 2 * self.njoints, self.nfeats)  # Updated
+        else:
+            output = output.reshape(nframes, bs, self.njoints, self.nfeats)
+        output = output.permute(1, 2, 3, 0)  # [bs, 2 *njoints, nfeats, nframes]
         return output
 
 class OutputProcess_wGCN(nn.Module):
-    def __init__(self, data_rep, input_feats, latent_dim, njoints, nfeats):
+    def __init__(self, data_rep, input_feats, latent_dim, njoints, nfeats, learning_var):
         super().__init__()
         self.data_rep = data_rep
         self.input_feats = input_feats
         self.latent_dim = latent_dim
         self.njoints = njoints
         self.nfeats = nfeats
+        self.learning_var = learning_var
         # Update: Output layer now has 2 * input_feats to include variance
-        self.poseFinal = GraphConvolution(self.latent_dim, self.input_feats*2, node_n=196, bias=True)
+        if self.learning_var:
+            self.poseFinal = GraphConvolution(self.latent_dim, self.input_feats*2, node_n=196, bias=True)
+        else:
+            self.poseFinal = GraphConvolution(self.latent_dim, self.input_feats, node_n=196, bias=True)
         if self.data_rep == 'rot_vel':
             # self.velFinal = nn.Linear(self.latent_dim, self.input_feats)
             raise ValueError # Not implemented yet
@@ -401,7 +420,10 @@ class OutputProcess_wGCN(nn.Module):
         else:
             raise ValueError
         # Update: Reshape to include doubled features for mean and variance
-        output = output.reshape(nframes, bs, 2 * self.njoints, self.nfeats)  # Updated
+        if self.learning_var:
+            output = output.reshape(nframes, bs, 2 * self.njoints, self.nfeats)  # Updated
+        else:
+            output = output.reshape(nframes, bs, self.njoints, self.nfeats)
         output = output.permute(1, 2, 3, 0)  # [bs, 2 *njoints, nfeats, nframes] Updated
         return output
 
