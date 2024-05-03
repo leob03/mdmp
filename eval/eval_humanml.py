@@ -87,9 +87,6 @@ def evaluate_fid(eval_wrapper, groundtruth_loader, activation_dict, file):
     # print(gt_mu)
     for model_name, motion_embeddings in activation_dict.items():
         mu, cov = calculate_activation_statistics(motion_embeddings)
-
-        mu = np.nan_to_num(mu, nan=0.0, posinf=0.0, neginf=0.0)
-        cov = np.nan_to_num(cov, nan=0.0, posinf=0.0, neginf=0.0)
         fid = calculate_frechet_distance(gt_mu, gt_cov, mu, cov)
         print(f'---> [{model_name}] FID: {fid:.4f}')
         print(f'---> [{model_name}] FID: {fid:.4f}', file=file, flush=True)
@@ -252,6 +249,7 @@ if __name__ == '__main__':
         diversity_times = 300
         replication_times = 1
         # replication_times = 5  # about 3 Hrs
+
     elif args.eval_mode == 'wo_mm':
         num_samples_limit = 1000
         run_mm = False
@@ -304,5 +302,4 @@ if __name__ == '__main__':
     }
 
     eval_wrapper = EvaluatorMDMWrapper(args.dataset, dist_util.dev())
-    print('Evaluation Model Wrapper Created!!!')
     evaluation(eval_wrapper, gt_loader, eval_motion_loaders, log_file, replication_times, diversity_times, mm_num_times, run_mm=run_mm)
