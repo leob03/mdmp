@@ -155,7 +155,7 @@ def plot_3d_motion(save_path, kinematic_tree, joints, title, dataset, variance =
 
 
 def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, variance = None, gt_data=None, figsize=(3, 3), fps=120, radius=3,
-                   vis_mode='default', gt_frames=[]):
+                   vis_mode='default', gt_frames=[], emb_motion_len=0):
     matplotlib.use('Agg')
 
     title = '\n'.join(wrap(title, 20))
@@ -184,12 +184,14 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
 
     # (seq_len, joints_num, 3)
     data = joints.copy().reshape(len(joints), -1, 3)
+    gt_data = gt_data.copy().reshape(len(gt_data), -1, 3)
 
     # preparation related to specific datasets
     if dataset == 'kit':
         data *= 0.003  # scale for visualization
     elif dataset == 'humanml':
         data *= 1.3  # scale for visualization
+        gt_data *= 1.3
     elif dataset in ['humanact12', 'uestc']:
         data *= -1.5 # reverse axes, scale for visualization
 
@@ -209,16 +211,17 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
         colors = colors_blue
 
     frame_number = data.shape[0]
-    #     print(dataset.shape)
 
     height_offset = MINS[1]
     data[:, :, 1] -= height_offset
+    gt_data[:, :, 1] -= height_offset
     trajec = data[:, 0, [0, 2]]
 
     data[..., 0] -= data[:, 0:1, 0]
     data[..., 2] -= data[:, 0:1, 2]
+    gt_data[..., 0] -= gt_data[:, 0:1, 0]
+    gt_data[..., 2] -= gt_data[:, 0:1, 2]
 
-    #     print(trajec.shape)
 
     def draw_sphere(position, radius, color='c', alpha=0.1):
         u, v = np.mgrid[0:2*np.pi:20j, 0:np.pi:10j]
@@ -228,49 +231,42 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
         ax.plot_surface(x, y, z, color=color, alpha=alpha)
 
     def update(index):
-        #         print(index)
         ax.lines = []
         ax.collections = []
         ax.view_init(elev=120, azim=-90)
         ax.dist = 7.5
-        #         ax =
+
         plot_xzPlane(MINS[0] - trajec[index, 0], MAXS[0] - trajec[index, 0], 0, MINS[2] - trajec[index, 1],
                      MAXS[2] - trajec[index, 1])
-        #         ax.scatter(dataset[index, :22, 0], dataset[index, :22, 1], dataset[index, :22, 2], color='black', s=3)
 
-        # if index > 1:
-        #     ax.plot3D(trajec[:index, 0] - trajec[index, 0], np.zeros_like(trajec[:index, 0]),
-        #               trajec[:index, 1] - trajec[index, 1], linewidth=1.0,
-        #               color='blue')
-        # #             ax = plot_xzPlane(ax, MINS[0], MAXS[0], 0, MINS[2], MAXS[2])
+        # used_colors = colors_blue if index in gt_frames else colors
 
-        used_colors = colors_blue if index in gt_frames else colors
-        for i, (chain, color) in enumerate(zip(kinematic_tree, used_colors)):
+        for i, (chain, color_orange, color_blue) in enumerate(zip(kinematic_tree, colors_orange, colors_blue)):
             if i < 5:
                 linewidth = 4.0
             else:
                 linewidth = 2.0
-            ax.plot3D(data[index, chain, 0], data[index, chain, 1], data[index, chain, 2], linewidth=linewidth,
-                      color=color)
-        #         print(trajec[:index, 0].shape)
+            if index > emb_motion_len:
+                ax.plot3D(data[index, chain, 0], data[index, chain, 1], data[index, chain, 2], linewidth=linewidth, color=color_orange)
+            ax.plot3D(gt_data[index, chain, 0], gt_data[index, chain, 1], gt_data[index, chain, 2], linewidth=linewidth, color=color_blue)
         
-        if gt_data is not None:
-            gt_motion = gt_data[index]
-            # Check if it's a tensor or numpy array and handle reshaping accordingly
-            if isinstance(gt_motion, torch.Tensor):
-                gt_motion = gt_motion.cpu().numpy()  # Convert to numpy array for uniformity
+        # if gt_data is not None:
+        #     gt_motion = gt_data[index]
+        #     # Check if it's a tensor or numpy array and handle reshaping accordingly
+        #     if isinstance(gt_motion, torch.Tensor):
+        #         gt_motion = gt_motion.cpu().numpy()  # Convert to numpy array for uniformity
             
-            if gt_motion.size % 3 == 0:
-                gt_motion = gt_motion.reshape(-1, 3)
-            else:
-                raise ValueError(f"gt_motion of index {index} can't be reshaped to a 2D array of shape [-1, 3]")
+        #     if gt_motion.size % 3 == 0:
+        #         gt_motion = gt_motion.reshape(-1, 3)
+        #     else:
+        #         raise ValueError(f"gt_motion of index {index} can't be reshaped to a 2D array of shape [-1, 3]")
 
-            for i, (chain, color) in enumerate(zip(kinematic_tree, colors_blue)):
-                if i < 5:
-                    linewidth = 4.0
-                else:
-                    linewidth = 2.0
-                ax.plot3D(gt_motion[chain, 0], gt_motion[chain, 1], gt_motion[chain, 2], linewidth=linewidth, color=color)
+        #     for i, (chain, color) in enumerate(zip(kinematic_tree, colors_blue)):
+        #         if i < 5:
+        #             linewidth = 4.0
+        #         else:
+        #             linewidth = 2.0
+        #         ax.plot3D(gt_motion[chain, 0], gt_motion[chain, 1], gt_motion[chain, 2], linewidth=linewidth, color=color)
         
 
         plt.axis('off')
