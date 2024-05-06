@@ -118,6 +118,9 @@ def main():
         if args.guidance_param != 1:
             model_kwargs['y']['scale'] = torch.ones(args.batch_size, device=dist_util.dev()) * args.guidance_param
         model_kwargs['y']['motion_embed'] = input_motions
+        model_kwargs['y']['motion_embed_mask'] = torch.ones_like(input_motions, dtype=torch.bool, device=input_motions.device)
+        start_idx = args.emb_motion_len
+        model_kwargs['y']['motion_embed_mask'][:, :, :, start_idx:] = False
         sample_fn = diffusion.p_sample_loop
 
         if args.learning_var:
