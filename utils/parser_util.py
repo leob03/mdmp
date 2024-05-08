@@ -61,7 +61,7 @@ def add_base_options(parser):
     group.add_argument("--device", default=0, type=int, help="Device id to use.")
     group.add_argument("--seed", default=10, type=int, help="For fixing random seed.")
     group.add_argument("--batch_size", default=64, type=int, help="Batch size during training.")
-    group.add_argument("--learning_var", default=True, type=bool, help="If True, will learn the variance during the diffusion process.")
+    group.add_argument("--learning_var", default=False, type=bool, help="If True, will learn the variance during the diffusion process.")
 
 
 def add_diffusion_options(parser):
@@ -79,7 +79,7 @@ def add_model_options(parser):
                        choices=['trans_enc', 'trans_dec', 'gru'], type=str,
                        help="Architecture types as reported in the paper.")
     group.add_argument("--use_gcn", default=False, type=bool)
-    group.add_argument("--emb_motion_len", default=50, type=int)
+    group.add_argument("--emb_motion_len", default=0, type=int)
     group.add_argument("--emb_trans_dec", default=False, type=bool,
                        help="For trans_dec architecture only, if true, will inject condition as a class token"
                             " (in addition to cross-attention).")

@@ -79,11 +79,14 @@ def get_mdm_loader(model, diffusion, batch_size, ground_truth_loader, mm_num_sam
     print('Generating %s ...' % opt['name'])
     # dataset = CompMDMGeneratedDataset(opt, ground_truth_dataset, ground_truth_dataset.w_vectorizer, mm_num_samples, mm_num_repeats)
     dataset = CompMDMGeneratedDataset(model, diffusion, ground_truth_loader, mm_num_samples, mm_num_repeats, max_motion_length, num_samples_limit, scale)
+    print('Generated CompMDM Dataset Loading Completed!!!')
 
     mm_dataset = MMGeneratedDataset(opt, dataset, ground_truth_loader.dataset.w_vectorizer)
+    print('Generated MM Dataset Loading Completed!!!')
 
     # NOTE: bs must not be changed! this will cause a bug in R precision calc!
     motion_loader = DataLoader(dataset, batch_size=batch_size, collate_fn=collate_fn, drop_last=True, num_workers=4)
+    print('Generated CompMDM DataLoader Loading Completed!!!')
     mm_motion_loader = DataLoader(mm_dataset, batch_size=1, num_workers=1)
 
     print('Generated Dataset Loading Completed!!!')
