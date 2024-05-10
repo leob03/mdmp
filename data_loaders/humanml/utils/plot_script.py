@@ -248,6 +248,12 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
                 linewidth = 2.0
             if index > emb_motion_len:
                 ax.plot3D(data[index, chain, 0], data[index, chain, 1], data[index, chain, 2], linewidth=linewidth, color=color_orange)
+
+        for i, (chain, color_orange, color_blue) in enumerate(zip(kinematic_tree, colors_orange, colors_blue)):
+            if i < 5:
+                linewidth = 4.0
+            else:
+                linewidth = 2.0       
             ax.plot3D(gt_data[index, chain, 0], gt_data[index, chain, 1], gt_data[index, chain, 2], linewidth=linewidth, color=color_blue)
         
         # if gt_data is not None:

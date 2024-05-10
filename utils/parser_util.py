@@ -78,8 +78,8 @@ def add_model_options(parser):
     group.add_argument("--arch", default='trans_enc',
                        choices=['trans_enc', 'trans_dec', 'gru'], type=str,
                        help="Architecture types as reported in the paper.")
-    group.add_argument("--use_gcn", default=False, type=bool)
-    group.add_argument("--emb_motion_len", default=0, type=int)
+    group.add_argument("--use_gcn", default=True, type=bool)
+    group.add_argument("--emb_motion_len", default=50, type=int)
     group.add_argument("--emb_trans_dec", default=False, type=bool,
                        help="For trans_dec architecture only, if true, will inject condition as a class token"
                             " (in addition to cross-attention).")

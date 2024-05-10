@@ -5,4 +5,5 @@ a person lifts their right arm and slaps something, then repeats the motion agai
 a person walks forward and stops.
 a person marches forward, turns around, and then marches back.
 a person is stretching their arms.
-person is making attention gesture
+person is making attention gesture.
+a person walks forward, stops, turns on the side and continue walking forward.
