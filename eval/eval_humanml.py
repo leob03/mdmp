@@ -1,7 +1,7 @@
 from utils.parser_util import evaluation_parser
 from utils.fixseed import fixseed
 from datetime import datetime
-from data_loaders.humanml.motion_loaders.model_motion_loaders import get_mdm_loader  # get_motion_loader
+from data_loaders.humanml.motion_loaders.model_motion_loaders import get_mdm_loader, get_mdmp_loader  # get_motion_loader
 from data_loaders.humanml.utils.metrics import *
 from data_loaders.humanml.networks.evaluator_wrapper import EvaluatorMDMWrapper
 from collections import OrderedDict
@@ -15,6 +15,14 @@ from data_loaders.get_data import get_dataset_loader
 from model.cfg_sampler import ClassifierFreeSampleModel
 
 torch.multiprocessing.set_sharing_strategy('file_system')
+
+# def evaluate_mjpje(eval_wrapper, motion_loaders, file):
+#     mjpje_dict = OrderedDict({})
+#     print('========== Evaluating MJPJE ==========')
+#     for motion_loader_name, motion_loader in motion_loaders.items():
+#         all_motion_embeddings = []
+#n don't forget to modify: word_embeddings, pos_one_hots, _, sent_lens, _, motions, +, log_variance, m_lens, _ = batch when self.learn_var
+
 
 def evaluate_matching_score(eval_wrapper, motion_loaders, file):
     match_score_dict = OrderedDict({})
@@ -30,7 +38,7 @@ def evaluate_matching_score(eval_wrapper, motion_loaders, file):
         # print(motion_loader_name)
         with torch.no_grad():
             for idx, batch in enumerate(motion_loader):
-                word_embeddings, pos_one_hots, _, sent_lens, motions, m_lens, _ = batch
+                word_embeddings, pos_one_hots, _, sent_lens, _, motions, m_lens, _ = batch
                 text_embeddings, motion_embeddings = eval_wrapper.get_co_embeddings(
                     word_embs=word_embeddings,
                     pos_ohot=pos_one_hots,
@@ -75,7 +83,7 @@ def evaluate_fid(eval_wrapper, groundtruth_loader, activation_dict, file):
     print('========== Evaluating FID ==========')
     with torch.no_grad():
         for idx, batch in enumerate(groundtruth_loader):
-            _, _, _, sent_lens, motions, m_lens, _ = batch
+            _, _, _, sent_lens, _, motions, m_lens, _ = batch
             motion_embeddings = eval_wrapper.get_motion_embeddings(
                 motions=motions,
                 m_lens=m_lens
@@ -295,7 +303,7 @@ if __name__ == '__main__':
         ################
         ## HumanML3D Dataset##
         ################
-        'vald': lambda: get_mdm_loader(
+        'vald': lambda: get_mdmp_loader(
             model, diffusion, args.batch_size,
             gen_loader, mm_num_samples, mm_num_repeats, gt_loader.dataset.opt.max_motion_length, num_samples_limit, args.guidance_param
         )

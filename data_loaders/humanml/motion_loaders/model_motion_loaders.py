@@ -1,6 +1,6 @@
 from torch.utils.data import DataLoader, Dataset
 from data_loaders.humanml.utils.get_opt import get_opt
-from data_loaders.humanml.motion_loaders.comp_v6_model_dataset import CompMDMGeneratedDataset
+from data_loaders.humanml.motion_loaders.comp_v6_model_dataset import CompMDMGeneratedDataset, CompMDMPGeneratedDataset, CompV6GeneratedDataset
 from data_loaders.humanml.utils.word_vectorizer import WordVectorizer
 import numpy as np
 from torch.utils.data._utils.collate import default_collate
@@ -87,6 +87,26 @@ def get_mdm_loader(model, diffusion, batch_size, ground_truth_loader, mm_num_sam
     # NOTE: bs must not be changed! this will cause a bug in R precision calc!
     motion_loader = DataLoader(dataset, batch_size=batch_size, collate_fn=collate_fn, drop_last=True, num_workers=4)
     print('Generated CompMDM DataLoader Loading Completed!!!')
+    mm_motion_loader = DataLoader(mm_dataset, batch_size=1, num_workers=1)
+
+    print('Generated Dataset Loading Completed!!!')
+
+    return motion_loader, mm_motion_loader
+
+def get_mdmp_loader(model, diffusion, batch_size, ground_truth_loader, mm_num_samples, mm_num_repeats, max_motion_length, num_samples_limit, scale):
+    opt = {
+        'name': 'test',  # FIXME
+    }
+    print('Generating %s ...' % opt['name'])
+    dataset = CompMDMPGeneratedDataset(model, diffusion, ground_truth_loader, mm_num_samples, mm_num_repeats, max_motion_length, num_samples_limit, scale)
+    print('Generated CompMDMP Dataset Loading Completed!!!')
+
+    mm_dataset = MMGeneratedDataset(opt, dataset, ground_truth_loader.dataset.w_vectorizer)
+    print('Generated MM Dataset Loading Completed!!!')
+
+    # NOTE: bs must not be changed! this will cause a bug in R precision calc!
+    motion_loader = DataLoader(dataset, batch_size=batch_size, collate_fn=collate_fn, drop_last=True, num_workers=4)
+    print('Generated CompMDMP DataLoader Loading Completed!!!')
     mm_motion_loader = DataLoader(mm_dataset, batch_size=1, num_workers=1)
 
     print('Generated Dataset Loading Completed!!!')
