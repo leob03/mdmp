@@ -16,15 +16,38 @@ from model.cfg_sampler import ClassifierFreeSampleModel
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
-# def evaluate_mjpje(eval_wrapper, motion_loaders, file):
-#     mjpje_dict = OrderedDict({})
-#     print('========== Evaluating MJPJE ==========')
-#     for motion_loader_name, motion_loader in motion_loaders.items():
-#         all_motion_embeddings = []
-#n don't forget to modify: word_embeddings, pos_one_hots, _, sent_lens, _, motions, +, log_variance, m_lens, _ = batch when self.learn_var
+def evaluate_mjpje(eval_wrapper, motion_loaders, file, learning_var, start_idx, get_xyz):
+    mjpje_dict = OrderedDict({})
+    print('========== Evaluating MJPJE ==========')
+    for motion_loader_name, motion_loader in motion_loaders.items():
+        with torch.no_grad():
+            for idx, batch in enumerate(motion_loader):
+                if learning_var:
+                    _, _, _, _, input_motion, motion, _, _, _ = batch
+                else:
+                    _, _, _, _, input_motion, motion, _, _ = batch
+                # rot_mse = masked_l2(input_motion, motion, mask)
+                target_xyz = get_xyz(input_motion)
+                pred_xyz = get_xyz(motion)
+                mask = torch.ones_like(target_xyz, dtype=torch.bool, device=target_xyz.device)
+                mask[:, :, :, start_idx:] = False
+                l2_loss = lambda a, b: (a - b) ** 2
+                loss = l2_loss(target_xyz, pred_xyz)
+                loss = (loss * mask.float()).sum(dim=list(range(1, len((loss * mask.float()).shape))))
+                n_entries = target_xyz.shape[1] * target_xyz.shape[2]
+                non_zero_elements = (mask).sum(dim=list(range(1, len((mask).shape)))) * n_entries
+                mse_loss_val = loss / non_zero_elements
 
 
-def evaluate_matching_score(eval_wrapper, motion_loaders, file):
+
+                
+
+
+                
+                
+
+
+def evaluate_matching_score(eval_wrapper, motion_loaders, file, learning_var):
     match_score_dict = OrderedDict({})
     R_precision_dict = OrderedDict({})
     activation_dict = OrderedDict({})
@@ -38,7 +61,10 @@ def evaluate_matching_score(eval_wrapper, motion_loaders, file):
         # print(motion_loader_name)
         with torch.no_grad():
             for idx, batch in enumerate(motion_loader):
-                word_embeddings, pos_one_hots, _, sent_lens, _, motions, m_lens, _ = batch
+                if learning_var:
+                    word_embeddings, pos_one_hots, _, sent_lens, _, motions, _, m_lens, _ = batch
+                else:
+                    word_embeddings, pos_one_hots, _, sent_lens, _, motions, m_lens, _ = batch
                 text_embeddings, motion_embeddings = eval_wrapper.get_co_embeddings(
                     word_embs=word_embeddings,
                     pos_ohot=pos_one_hots,
@@ -77,13 +103,16 @@ def evaluate_matching_score(eval_wrapper, motion_loaders, file):
     return match_score_dict, R_precision_dict, activation_dict
 
 
-def evaluate_fid(eval_wrapper, groundtruth_loader, activation_dict, file):
+def evaluate_fid(eval_wrapper, groundtruth_loader, activation_dict, file, learning_var):
     eval_dict = OrderedDict({})
     gt_motion_embeddings = []
     print('========== Evaluating FID ==========')
     with torch.no_grad():
         for idx, batch in enumerate(groundtruth_loader):
-            _, _, _, sent_lens, _, motions, m_lens, _ = batch
+            if learning_var:
+                _, _, _, sent_lens, _, motions, _, m_lens, _ = batch
+            else:
+                _, _, _, sent_lens, _, motions, m_lens, _ = batch
             motion_embeddings = eval_wrapper.get_motion_embeddings(
                 motions=motions,
                 m_lens=m_lens
@@ -142,7 +171,7 @@ def get_metric_statistics(values, replication_times):
     return mean, conf_interval
 
 
-def evaluation(eval_wrapper, gt_loader, eval_motion_loaders, log_file, replication_times, diversity_times, mm_num_times, run_mm=False):
+def evaluation(eval_wrapper, gt_loader, eval_motion_loaders, log_file, replication_times, diversity_times, mm_num_times, learning_var, start_idx, get_xyz, run_mm=False):
     with open(log_file, 'w') as f:
         all_metrics = OrderedDict({'Matching Score': OrderedDict({}),
                                    'R_precision': OrderedDict({}),
@@ -162,11 +191,11 @@ def evaluation(eval_wrapper, gt_loader, eval_motion_loaders, log_file, replicati
             print(f'==================== Replication {replication} ====================', file=f, flush=True)
             print(f'Time: {datetime.now()}')
             print(f'Time: {datetime.now()}', file=f, flush=True)
-            mat_score_dict, R_precision_dict, acti_dict = evaluate_matching_score(eval_wrapper, motion_loaders, f)
+            mat_score_dict, R_precision_dict, acti_dict = evaluate_matching_score(eval_wrapper, motion_loaders, f, learning_var)
 
             print(f'Time: {datetime.now()}')
             print(f'Time: {datetime.now()}', file=f, flush=True)
-            fid_score_dict = evaluate_fid(eval_wrapper, gt_loader, acti_dict, f)
+            fid_score_dict = evaluate_fid(eval_wrapper, gt_loader, acti_dict, f, learning_var)
 
             print(f'Time: {datetime.now()}')
             print(f'Time: {datetime.now()}', file=f, flush=True)
@@ -237,6 +266,7 @@ if __name__ == '__main__':
     args = evaluation_parser()
     fixseed(args.seed)
     args.batch_size = 32 # This must be 32! Don't change it! otherwise it will cause a bug in R precision calc!
+    start_idx = args.emb_motion_len
     name = os.path.basename(os.path.dirname(args.model_path))
     niter = os.path.basename(args.model_path).replace('model', '').replace('.pt', '')
     log_file = os.path.join(os.path.dirname(args.model_path), 'eval_humanml_{}_{}'.format(name, niter))
@@ -289,6 +319,13 @@ if __name__ == '__main__':
 
     logger.log("Creating model and diffusion...")
     model, diffusion = create_model_and_diffusion(args, gen_loader)
+    learning_var = model.learning_var
+    enc = model.model
+    get_xyz = lambda sample: enc.rot2xyz(sample, mask=None, pose_rep=enc.pose_rep, translation=enc.translation,
+                                             glob=enc.glob,
+                                             # jointstype='vertices',  # 3.4 iter/sec # USED ALSO IN MotionCLIP
+                                             jointstype='smpl',  # 3.4 iter/sec
+                                             vertstrans=False)
 
     logger.log(f"Loading checkpoints from [{args.model_path}]...")
     state_dict = torch.load(args.model_path, map_location='cpu')
@@ -310,4 +347,4 @@ if __name__ == '__main__':
     }
 
     eval_wrapper = EvaluatorMDMWrapper(args.dataset, dist_util.dev())
-    evaluation(eval_wrapper, gt_loader, eval_motion_loaders, log_file, replication_times, diversity_times, mm_num_times, run_mm=run_mm)
+    evaluation(eval_wrapper, gt_loader, eval_motion_loaders, log_file, replication_times, diversity_times, mm_num_times, learning_var, start_idx, get_xyz, run_mm=run_mm)
