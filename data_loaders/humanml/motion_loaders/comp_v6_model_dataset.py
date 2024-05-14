@@ -296,7 +296,8 @@ class CompMDMPGeneratedDataset(Dataset):
 
     def __init__(self, model, diffusion, dataloader, mm_num_samples, mm_num_repeats, max_motion_length, num_samples_limit, scale=1.):
         self.dataloader = dataloader
-        self.learn_var = diffusion.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]
+        # self.learn_var = diffusion.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]
+        self.learn_var = diffusion.model_var_type.value in [ModelVarType.LEARNED.value, ModelVarType.LEARNED_RANGE.value]
         self.dataset = dataloader.dataset
         assert mm_num_samples < len(dataloader.dataset)
         use_ddim = False  # FIXME - hardcoded

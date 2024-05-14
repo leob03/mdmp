@@ -19,32 +19,90 @@ torch.multiprocessing.set_sharing_strategy('file_system')
 def evaluate_mjpje(eval_wrapper, motion_loaders, file, learning_var, start_idx, get_xyz):
     mjpje_dict = OrderedDict({})
     print('========== Evaluating MJPJE ==========')
+
     for motion_loader_name, motion_loader in motion_loaders.items():
+        mean_errors = []
         with torch.no_grad():
             for idx, batch in enumerate(motion_loader):
                 if learning_var:
                     _, _, _, _, input_motion, motion, _, _, _ = batch
                 else:
                     _, _, _, _, input_motion, motion, _, _ = batch
-                # rot_mse = masked_l2(input_motion, motion, mask)
-                target_xyz = get_xyz(input_motion)
+                
+                B, nb_joints, _, nb_frames = input_motion.shape
+
+                # Convert to XYZ format
+                target_xyz = get_xyz(input_motion)  # (B, nb_joints, 3, nb_frames)
                 pred_xyz = get_xyz(motion)
+
                 mask = torch.ones_like(target_xyz, dtype=torch.bool, device=target_xyz.device)
-                mask[:, :, :, start_idx:] = False
-                l2_loss = lambda a, b: (a - b) ** 2
-                loss = l2_loss(target_xyz, pred_xyz)
-                loss = (loss * mask.float()).sum(dim=list(range(1, len((loss * mask.float()).shape))))
-                n_entries = target_xyz.shape[1] * target_xyz.shape[2]
-                non_zero_elements = (mask).sum(dim=list(range(1, len((mask).shape)))) * n_entries
-                mse_loss_val = loss / non_zero_elements
-
-
-
+                mask[:, :, :, :start_idx] = False
                 
+                target_xyz_reshaped = target_xyz.permute(0, 3, 1, 2).reshape(-1, nb_joints, 3)
+                pred_xyz_reshaped = pred_xyz.permute(0, 3, 1, 2).reshape(-1, nb_joints, 3)
+                mask_reshaped = mask.permute(0, 3, 1, 2).reshape(-1, nb_joints, 3)
 
+                # Apply the mask to filter out the relevant values
+                masked_target_xyz = target_xyz_reshaped[mask_reshaped]
+                masked_pred_xyz = pred_xyz_reshaped[mask_reshaped]
 
+                # Compute the per-joint position error for each frame
+                per_joint_errors = torch.norm(masked_target_xyz - masked_pred_xyz, dim=1)
+
+                # Compute the mean error across all joints and frames
+                mean_3d_err = torch.mean(per_joint_errors)
+                mean_errors.append(mean_3d_err.item())
+
+        mjpje_dict[motion_loader_name] = sum(mean_errors) / len(mean_errors) if mean_errors else float('inf')
+
+        print(f'---> [{motion_loader_name}]: MJPJE = {mjpje_dict[motion_loader_name]:.4f}')
+        print(f'---> [{motion_loader_name}]: MJPJE = {mjpje_dict[motion_loader_name]:.4f}', file=file, flush=True)
+
+    return mjpje_dict
+
+# def evaluate_ngll(eval_wrapper, motion_loaders, file, learning_var, start_idx, get_xyz):
+#     mjpje_dict = OrderedDict({})
+#     print('========== Evaluating NGLL ==========')
+
+#     for motion_loader_name, motion_loader in motion_loaders.items():
+#         mean_errors = []
+#         with torch.no_grad():
+#             for idx, batch in enumerate(motion_loader):
+#                 if learning_var:
+#                     _, _, _, _, input_motion, motion, log_variance, _, _ = batch -------> here
+#                 else:
+#                     _, _, _, _, input_motion, motion, _, _ = batch
                 
+#                 B, nb_joints, _, nb_frames = input_motion.shape
+
+#                 # Convert to XYZ format
+#                 target_xyz = get_xyz(input_motion)  # (B, nb_joints, 3, nb_frames)
+#                 pred_xyz = get_xyz(motion)
+
+#                 mask = torch.ones_like(target_xyz, dtype=torch.bool, device=target_xyz.device)
+#                 mask[:, :, :, :start_idx] = False
                 
+#                 target_xyz_reshaped = target_xyz.permute(0, 3, 1, 2).reshape(-1, nb_joints, 3)
+#                 pred_xyz_reshaped = pred_xyz.permute(0, 3, 1, 2).reshape(-1, nb_joints, 3)
+#                 mask_reshaped = mask.permute(0, 3, 1, 2).reshape(-1, nb_joints, 3)
+
+#                 # Apply the mask to filter out the relevant values
+#                 masked_target_xyz = target_xyz_reshaped[mask_reshaped]
+#                 masked_pred_xyz = pred_xyz_reshaped[mask_reshaped]
+
+#                 # Compute the per-joint position error for each frame
+#                 per_joint_errors = torch.norm(masked_target_xyz - masked_pred_xyz, dim=1)
+
+#                 # Compute the mean error across all joints and frames
+#                 mean_3d_err = torch.mean(per_joint_errors)
+#                 mean_errors.append(mean_3d_err.item())
+
+#         mjpje_dict[motion_loader_name] = sum(mean_errors) / len(mean_errors) if mean_errors else float('inf')
+
+#         print(f'---> [{motion_loader_name}]: MJPJE = {mjpje_dict[motion_loader_name]:.4f}')
+#         print(f'---> [{motion_loader_name}]: MJPJE = {mjpje_dict[motion_loader_name]:.4f}', file=file, flush=True)
+
+#     return mjpje_dict
 
 
 def evaluate_matching_score(eval_wrapper, motion_loaders, file, learning_var):
@@ -201,6 +259,10 @@ def evaluation(eval_wrapper, gt_loader, eval_motion_loaders, log_file, replicati
             print(f'Time: {datetime.now()}', file=f, flush=True)
             div_score_dict = evaluate_diversity(acti_dict, f, diversity_times)
 
+            print(f'Time: {datetime.now()}')
+            print(f'Time: {datetime.now()}', file=f, flush=True)
+            mjpje_dict = evaluate_mjpje(eval_wrapper, motion_loaders, f, learning_var, start_idx, get_xyz)
+
             if run_mm:
                 print(f'Time: {datetime.now()}')
                 print(f'Time: {datetime.now()}', file=f, flush=True)
@@ -232,6 +294,13 @@ def evaluation(eval_wrapper, gt_loader, eval_motion_loaders, log_file, replicati
                     all_metrics['Diversity'][key] = [item]
                 else:
                     all_metrics['Diversity'][key] += [item]
+            
+            for key, item in mjpje_dict.items():
+                if key not in all_metrics['Diversity']:
+                    all_metrics['MJPJE'][key] = [item]
+                else:
+                    all_metrics['MJPJE'][key] += [item]
+                    
             if run_mm:
                 for key, item in mm_score_dict.items():
                     if key not in all_metrics['MultiModality']:
@@ -320,7 +389,7 @@ if __name__ == '__main__':
     logger.log("Creating model and diffusion...")
     model, diffusion = create_model_and_diffusion(args, gen_loader)
     learning_var = model.learning_var
-    enc = model.model
+    enc = model
     get_xyz = lambda sample: enc.rot2xyz(sample, mask=None, pose_rep=enc.pose_rep, translation=enc.translation,
                                              glob=enc.glob,
                                              # jointstype='vertices',  # 3.4 iter/sec # USED ALSO IN MotionCLIP
