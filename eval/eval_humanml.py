@@ -21,12 +21,16 @@ def evaluate_mjpje(eval_wrapper, motion_loaders, file, learning_var, start_idx, 
     mjpje_dict = OrderedDict({})
     print('========== Evaluating MJPJE ==========')
 
+    times_ms = [400, 1000, 1500, 2000]  # in milliseconds
+    frame_indices = [int(20 * (t / 1000.0)) - start_idx for t in times_ms]  # convert ms to frame index, adjust for start_idx
+
     for motion_loader_name, motion_loader in motion_loaders.items():
         mean_errors = []
+        mpjpe_specific_times = [[] for _ in times_ms]  # List to store MPJPE at specific times
         with torch.no_grad():
             for idx, batch in enumerate(motion_loader):
-                if learning_var:
-                    _, _, _, _, input_motion, motion, _, _, _ = batch
+                if motion_loader_name == 'ground truth':
+                    continue
                 else:
                     _, _, _, _, input_motion, motion, _, _ = batch
                 
@@ -49,15 +53,25 @@ def evaluate_mjpje(eval_wrapper, motion_loaders, file, learning_var, start_idx, 
 
                 # Compute the per-joint position error for each frame
                 per_joint_errors = torch.norm(masked_target_xyz - masked_pred_xyz, dim=1)
+                errors_reshaped = per_joint_errors.reshape(B, nb_frames - start_idx, nb_joints).mean(dim=2)  # Mean over joints
 
-                # Compute the mean error across all joints and frames
-                mean_3d_err = torch.mean(per_joint_errors)
+                # Compute the mean error across all joints and frames for overall MPJPE
+                mean_3d_err = errors_reshaped.mean()
                 mean_errors.append(mean_3d_err.item())
 
-        mjpje_dict[motion_loader_name] = sum(mean_errors) / len(mean_errors) if mean_errors else float('inf')
+                # Compute MPJPE at specific time frames
+                for idx, frame_idx in enumerate(frame_indices):
+                    if frame_idx < nb_frames - start_idx:
+                        mpjpe_at_time = errors_reshaped[:, frame_idx].mean()  # Average across the batch
+                        mpjpe_specific_times[idx].append(mpjpe_at_time.item())
 
-        print(f'---> [{motion_loader_name}]: MJPJE = {mjpje_dict[motion_loader_name]:.4f}')
-        print(f'---> [{motion_loader_name}]: MJPJE = {mjpje_dict[motion_loader_name]:.4f}', file=file, flush=True)
+        mjpje_dict[motion_loader_name] = sum(mean_errors) / len(mean_errors) if mean_errors else float('inf')
+        print(f'---> [{motion_loader_name}]: Overall MPJPE = {mjpje_dict[motion_loader_name]:.4f}')
+        for time_ms, errors_at_time in zip(times_ms, mpjpe_specific_times):
+            if errors_at_time:
+                avg_error = sum(errors_at_time) / len(errors_at_time)
+                print(f'---> [{motion_loader_name}]: MPJPE at {time_ms} ms = {avg_error:.4f}')
+                print(f'---> [{motion_loader_name}]: MPJPE at {time_ms} ms = {avg_error:.4f}', file=file, flush=True)
 
     return mjpje_dict
 
@@ -106,7 +120,7 @@ def evaluate_mjpje(eval_wrapper, motion_loaders, file, learning_var, start_idx, 
 #     return mjpje_dict
 
 
-def evaluate_matching_score(eval_wrapper, motion_loaders, file, learning_var):
+def evaluate_matching_score(eval_wrapper, motion_loaders, file):
     match_score_dict = OrderedDict({})
     R_precision_dict = OrderedDict({})
     activation_dict = OrderedDict({})
@@ -121,11 +135,11 @@ def evaluate_matching_score(eval_wrapper, motion_loaders, file, learning_var):
         with torch.no_grad():
             for idx, batch in enumerate(motion_loader):
                 # print(f"Batch {idx}: {batch}")  # Debug print
-                if learning_var:
-                    print('Learning Var goes here')
-                    word_embeddings, pos_one_hots, _, sent_lens, _, motions, _, m_lens, _ = batch
+                if motion_loader_name == 'ground truth':
+                    # print('here for gt')
+                    word_embeddings, pos_one_hots, _, sent_lens, motions, m_lens, _ = batch
                 else:
-                    print('No Learning Var goes here')
+                    # print('here for mdmp_motion_loader')
                     word_embeddings, pos_one_hots, _, sent_lens, _, motions, _, m_lens, _ = batch
                 text_embeddings, motion_embeddings = eval_wrapper.get_co_embeddings(
                     word_embs=word_embeddings,
@@ -165,16 +179,13 @@ def evaluate_matching_score(eval_wrapper, motion_loaders, file, learning_var):
     return match_score_dict, R_precision_dict, activation_dict
 
 
-def evaluate_fid(eval_wrapper, groundtruth_loader, activation_dict, file, learning_var):
+def evaluate_fid(eval_wrapper, groundtruth_loader, activation_dict, file):
     eval_dict = OrderedDict({})
     gt_motion_embeddings = []
     print('========== Evaluating FID ==========')
     with torch.no_grad():
         for idx, batch in enumerate(groundtruth_loader):
-            if learning_var:
-                _, _, _, sent_lens, _, motions, _, m_lens, _ = batch
-            else:
-                _, _, _, sent_lens, _, motions, m_lens, _ = batch
+            _, _, _, sent_lens, motions, m_lens, _ = batch
             motion_embeddings = eval_wrapper.get_motion_embeddings(
                 motions=motions,
                 m_lens=m_lens
@@ -253,11 +264,11 @@ def evaluation(eval_wrapper, gt_loader, eval_motion_loaders, log_file, replicati
             print(f'==================== Replication {replication} ====================', file=f, flush=True)
             print(f'Time: {datetime.now()}')
             print(f'Time: {datetime.now()}', file=f, flush=True)
-            mat_score_dict, R_precision_dict, acti_dict = evaluate_matching_score(eval_wrapper, motion_loaders, f, learning_var)
+            mat_score_dict, R_precision_dict, acti_dict = evaluate_matching_score(eval_wrapper, motion_loaders, f)
 
             print(f'Time: {datetime.now()}')
             print(f'Time: {datetime.now()}', file=f, flush=True)
-            fid_score_dict = evaluate_fid(eval_wrapper, gt_loader, acti_dict, f, learning_var)
+            fid_score_dict = evaluate_fid(eval_wrapper, gt_loader, acti_dict, f)
 
             print(f'Time: {datetime.now()}')
             print(f'Time: {datetime.now()}', file=f, flush=True)

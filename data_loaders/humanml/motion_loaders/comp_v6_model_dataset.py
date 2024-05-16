@@ -435,7 +435,7 @@ class CompMDMPGeneratedDataset(Dataset):
     def __getitem__(self, item):
         logging.debug("Fetching item at index %d", item)
         data = self.generated_motion[item]
-        logging.debug("Data at index %d: %s", item, data)
+        # logging.debug("Data at index %d: %s", item, data)
 
         input_motion, motion, m_length, caption, tokens = data['input_motion'], data['motion'], data['length'], data['caption'], data['tokens']
         if self.learn_var:
