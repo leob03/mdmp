@@ -1,7 +1,8 @@
 from utils.parser_util import evaluation_parser
 from utils.fixseed import fixseed
 from datetime import datetime
-from data_loaders.humanml.motion_loaders.model_motion_loaders import get_mdm_loader, get_mdmp_loader  # get_motion_loader
+# from data_loaders.humanml.motion_loaders.model_motion_loaders import get_mdm_loader
+from data_loaders.humanml.motion_loaders.model_motion_loaders import get_mdmp_loader  # get_motion_loader
 from data_loaders.humanml.utils.metrics import *
 from data_loaders.humanml.networks.evaluator_wrapper import EvaluatorMDMWrapper
 from collections import OrderedDict
@@ -119,10 +120,13 @@ def evaluate_matching_score(eval_wrapper, motion_loaders, file, learning_var):
         # print(motion_loader_name)
         with torch.no_grad():
             for idx, batch in enumerate(motion_loader):
+                # print(f"Batch {idx}: {batch}")  # Debug print
                 if learning_var:
+                    print('Learning Var goes here')
                     word_embeddings, pos_one_hots, _, sent_lens, _, motions, _, m_lens, _ = batch
                 else:
-                    word_embeddings, pos_one_hots, _, sent_lens, _, motions, m_lens, _ = batch
+                    print('No Learning Var goes here')
+                    word_embeddings, pos_one_hots, _, sent_lens, _, motions, _, m_lens, _ = batch
                 text_embeddings, motion_embeddings = eval_wrapper.get_co_embeddings(
                     word_embs=word_embeddings,
                     pos_ohot=pos_one_hots,

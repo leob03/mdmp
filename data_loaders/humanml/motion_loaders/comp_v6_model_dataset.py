@@ -7,6 +7,11 @@ from os.path import join as pjoin
 from tqdm import tqdm
 from utils import dist_util
 
+import logging
+
+# Configure logging
+logging.basicConfig(filename='debug.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
 class ModelVarType(enum.Enum):
     """
     What is used as the model's output variance.
@@ -157,139 +162,139 @@ class CompV6GeneratedDataset(Dataset):
                                      ], axis=0)
         return word_embeddings, pos_one_hots, caption, sent_len, motion, m_length, '_'.join(tokens)
 
-class CompMDMGeneratedDataset(Dataset):
+# class CompMDMGeneratedDataset(Dataset):
 
-    def __init__(self, model, diffusion, dataloader, mm_num_samples, mm_num_repeats, max_motion_length, num_samples_limit, scale=1.):
-        self.dataloader = dataloader
-        self.dataset = dataloader.dataset
-        assert mm_num_samples < len(dataloader.dataset)
-        use_ddim = False  # FIXME - hardcoded
-        clip_denoised = False  # FIXME - hardcoded
-        self.max_motion_length = max_motion_length
-        sample_fn = (
-            diffusion.p_sample_loop if not use_ddim else diffusion.ddim_sample_loop
-        )
+#     def __init__(self, model, diffusion, dataloader, mm_num_samples, mm_num_repeats, max_motion_length, num_samples_limit, scale=1.):
+#         self.dataloader = dataloader
+#         self.dataset = dataloader.dataset
+#         assert mm_num_samples < len(dataloader.dataset)
+#         use_ddim = False  # FIXME - hardcoded
+#         clip_denoised = False  # FIXME - hardcoded
+#         self.max_motion_length = max_motion_length
+#         sample_fn = (
+#             diffusion.p_sample_loop if not use_ddim else diffusion.ddim_sample_loop
+#         )
 
-        real_num_batches = len(dataloader)
-        if num_samples_limit is not None:
-            real_num_batches = num_samples_limit // dataloader.batch_size + 1
-        print('real_num_batches', real_num_batches)
+#         real_num_batches = len(dataloader)
+#         if num_samples_limit is not None:
+#             real_num_batches = num_samples_limit // dataloader.batch_size + 1
+#         print('real_num_batches', real_num_batches)
 
-        generated_motion = []
-        mm_generated_motions = []
-        if mm_num_samples > 0:
-            mm_idxs = np.random.choice(real_num_batches, mm_num_samples // dataloader.batch_size +1, replace=False)
-            mm_idxs = np.sort(mm_idxs)
-        else:
-            mm_idxs = []
-        print('mm_idxs', mm_idxs)
+#         generated_motion = []
+#         mm_generated_motions = []
+#         if mm_num_samples > 0:
+#             mm_idxs = np.random.choice(real_num_batches, mm_num_samples // dataloader.batch_size +1, replace=False)
+#             mm_idxs = np.sort(mm_idxs)
+#         else:
+#             mm_idxs = []
+#         print('mm_idxs', mm_idxs)
 
-        model.eval()
-
-
-        with torch.no_grad():
-            for i, (motion, model_kwargs) in tqdm(enumerate(dataloader)):
-
-                if num_samples_limit is not None and len(generated_motion) >= num_samples_limit:
-                    break
-
-                tokens = [t.split('_') for t in model_kwargs['y']['tokens']]
-
-                # add CFG scale to batch
-                if scale != 1.:
-                    model_kwargs['y']['scale'] = torch.ones(motion.shape[0],
-                                                            device=dist_util.dev()) * scale
-
-                mm_num_now = len(mm_generated_motions) // dataloader.batch_size
-                is_mm = i in mm_idxs
-                repeat_times = mm_num_repeats if is_mm else 1
-                mm_motions = []
-                for t in range(repeat_times):
-
-                    if diffusion.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
-                        sample, log_variance = sample_fn(
-                            model=model,
-                            shape=motion.shape,
-                            clip_denoised=clip_denoised,
-                            model_kwargs=model_kwargs,
-                            skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
-                            init_image=None,
-                            progress=False,
-                            dump_steps=None,
-                            noise=None,
-                            const_noise=False,
-                            # when experimenting guidance_scale we want to nutrileze the effect of noise on generation
-                        )
-                    else:
-                        sample = sample_fn(
-                            model=model,
-                            shape=motion.shape,
-                            clip_denoised=clip_denoised,
-                            model_kwargs=model_kwargs,
-                            skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
-                            init_image=None,
-                            progress=False,
-                            dump_steps=None,
-                            noise=None,
-                            const_noise=False,
-                            # when experimenting guidance_scale we want to nutrileze the effect of noise on generation
-                        )
-
-                    if t == 0:
-                        sub_dicts = [{
-                            'motion': sample[bs_i].squeeze().permute(1, 0).cpu().numpy(),
-                            'length': model_kwargs['y']['lengths'][bs_i].cpu().numpy(),
-                            'caption': model_kwargs['y']['text'][bs_i],
-                            'tokens': tokens[bs_i],
-                            'cap_len': tokens[bs_i].index('eos/OTHER') + 1, 
-                            } for bs_i in range(dataloader.batch_size)]
-                        generated_motion += sub_dicts
-
-                    if is_mm:
-                        mm_motions += [{'motion': sample[bs_i].squeeze().permute(1, 0).cpu().numpy(),
-                                        'length': model_kwargs['y']['lengths'][bs_i].cpu().numpy(),
-                                        } for bs_i in range(dataloader.batch_size)]
-
-                if is_mm:
-                    mm_generated_motions += [{
-                                    'caption': model_kwargs['y']['text'][bs_i],
-                                    'tokens': tokens[bs_i],
-                                    'cap_len': len(tokens[bs_i]),
-                                    'mm_motions': mm_motions[bs_i::dataloader.batch_size],  # collect all 10 repeats from the (32*10) generated motions
-                                    } for bs_i in range(dataloader.batch_size)]
+#         model.eval()
 
 
-        self.generated_motion = generated_motion
-        self.mm_generated_motion = mm_generated_motions
-        self.w_vectorizer = dataloader.dataset.w_vectorizer
+#         with torch.no_grad():
+#             for i, (motion, model_kwargs) in tqdm(enumerate(dataloader)):
+
+#                 if num_samples_limit is not None and len(generated_motion) >= num_samples_limit:
+#                     break
+
+#                 tokens = [t.split('_') for t in model_kwargs['y']['tokens']]
+
+#                 # add CFG scale to batch
+#                 if scale != 1.:
+#                     model_kwargs['y']['scale'] = torch.ones(motion.shape[0],
+#                                                             device=dist_util.dev()) * scale
+
+#                 mm_num_now = len(mm_generated_motions) // dataloader.batch_size
+#                 is_mm = i in mm_idxs
+#                 repeat_times = mm_num_repeats if is_mm else 1
+#                 mm_motions = []
+#                 for t in range(repeat_times):
+
+#                     if diffusion.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
+#                         sample, log_variance = sample_fn(
+#                             model=model,
+#                             shape=motion.shape,
+#                             clip_denoised=clip_denoised,
+#                             model_kwargs=model_kwargs,
+#                             skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
+#                             init_image=None,
+#                             progress=False,
+#                             dump_steps=None,
+#                             noise=None,
+#                             const_noise=False,
+#                             # when experimenting guidance_scale we want to nutrileze the effect of noise on generation
+#                         )
+#                     else:
+#                         sample = sample_fn(
+#                             model=model,
+#                             shape=motion.shape,
+#                             clip_denoised=clip_denoised,
+#                             model_kwargs=model_kwargs,
+#                             skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
+#                             init_image=None,
+#                             progress=False,
+#                             dump_steps=None,
+#                             noise=None,
+#                             const_noise=False,
+#                             # when experimenting guidance_scale we want to nutrileze the effect of noise on generation
+#                         )
+
+#                     if t == 0:
+#                         sub_dicts = [{
+#                             'motion': sample[bs_i].squeeze().permute(1, 0).cpu().numpy(),
+#                             'length': model_kwargs['y']['lengths'][bs_i].cpu().numpy(),
+#                             'caption': model_kwargs['y']['text'][bs_i],
+#                             'tokens': tokens[bs_i],
+#                             'cap_len': tokens[bs_i].index('eos/OTHER') + 1, 
+#                             } for bs_i in range(dataloader.batch_size)]
+#                         generated_motion += sub_dicts
+
+#                     if is_mm:
+#                         mm_motions += [{'motion': sample[bs_i].squeeze().permute(1, 0).cpu().numpy(),
+#                                         'length': model_kwargs['y']['lengths'][bs_i].cpu().numpy(),
+#                                         } for bs_i in range(dataloader.batch_size)]
+
+#                 if is_mm:
+#                     mm_generated_motions += [{
+#                                     'caption': model_kwargs['y']['text'][bs_i],
+#                                     'tokens': tokens[bs_i],
+#                                     'cap_len': len(tokens[bs_i]),
+#                                     'mm_motions': mm_motions[bs_i::dataloader.batch_size],  # collect all 10 repeats from the (32*10) generated motions
+#                                     } for bs_i in range(dataloader.batch_size)]
 
 
-    def __len__(self):
-        return len(self.generated_motion)
+#         self.generated_motion = generated_motion
+#         self.mm_generated_motion = mm_generated_motions
+#         self.w_vectorizer = dataloader.dataset.w_vectorizer
 
 
-    def __getitem__(self, item):
-        data = self.generated_motion[item]
-        motion, m_length, caption, tokens = data['motion'], data['length'], data['caption'], data['tokens']
-        sent_len = data['cap_len']
+#     def __len__(self):
+#         return len(self.generated_motion)
 
-        if self.dataset.mode == 'eval':
-            normed_motion = motion
-            denormed_motion = self.dataset.t2m_dataset.inv_transform(normed_motion)
-            renormed_motion = (denormed_motion - self.dataset.mean_for_eval) / self.dataset.std_for_eval  # according to T2M norms
-            motion = renormed_motion
-            # This step is needed because T2M evaluators expect their norm convention
 
-        pos_one_hots = []
-        word_embeddings = []
-        for token in tokens:
-            word_emb, pos_oh = self.w_vectorizer[token]
-            pos_one_hots.append(pos_oh[None, :])
-            word_embeddings.append(word_emb[None, :])
-        pos_one_hots = np.concatenate(pos_one_hots, axis=0)
-        word_embeddings = np.concatenate(word_embeddings, axis=0)
+#     def __getitem__(self, item):
+#         data = self.generated_motion[item]
+#         motion, m_length, caption, tokens = data['motion'], data['length'], data['caption'], data['tokens']
+#         sent_len = data['cap_len']
 
-        return word_embeddings, pos_one_hots, caption, sent_len, motion, m_length, '_'.join(tokens)
+#         if self.dataset.mode == 'eval':
+#             normed_motion = motion
+#             denormed_motion = self.dataset.t2m_dataset.inv_transform(normed_motion)
+#             renormed_motion = (denormed_motion - self.dataset.mean_for_eval) / self.dataset.std_for_eval  # according to T2M norms
+#             motion = renormed_motion
+#             # This step is needed because T2M evaluators expect their norm convention
+
+#         pos_one_hots = []
+#         word_embeddings = []
+#         for token in tokens:
+#             word_emb, pos_oh = self.w_vectorizer[token]
+#             pos_one_hots.append(pos_oh[None, :])
+#             word_embeddings.append(word_emb[None, :])
+#         pos_one_hots = np.concatenate(pos_one_hots, axis=0)
+#         word_embeddings = np.concatenate(word_embeddings, axis=0)
+
+#         return word_embeddings, pos_one_hots, caption, sent_len, motion, m_length, '_'.join(tokens)
 
 
 class CompMDMPGeneratedDataset(Dataset):
@@ -310,7 +315,7 @@ class CompMDMPGeneratedDataset(Dataset):
         real_num_batches = len(dataloader)
         if num_samples_limit is not None:
             real_num_batches = num_samples_limit // dataloader.batch_size + 1
-        print('real_num_batches', real_num_batches)
+        logging.debug('real_num_batches: %d', real_num_batches)
 
         generated_motion = []
         mm_generated_motions = []
@@ -319,7 +324,7 @@ class CompMDMPGeneratedDataset(Dataset):
             mm_idxs = np.sort(mm_idxs)
         else:
             mm_idxs = []
-        print('mm_idxs', mm_idxs)
+        logging.debug('mm_idxs: %s', mm_idxs)
 
         model.eval()
 
@@ -392,6 +397,7 @@ class CompMDMPGeneratedDataset(Dataset):
                                 'tokens': tokens[bs_i],
                                 'cap_len': tokens[bs_i].index('eos/OTHER') + 1, 
                                 } for bs_i in range(dataloader.batch_size)]
+                        # print(f"Generated sub_dicts: {sub_dicts}")  # Debug print
                         generated_motion += sub_dicts
 
                     if is_mm:
@@ -422,14 +428,21 @@ class CompMDMPGeneratedDataset(Dataset):
 
 
     def __len__(self):
-        return len(self.generated_motion)
-
+        length = len(self.generated_motion)
+        logging.debug('len of generated motion: %d', length)
+        return length
 
     def __getitem__(self, item):
+        logging.debug("Fetching item at index %d", item)
         data = self.generated_motion[item]
+        logging.debug("Data at index %d: %s", item, data)
+
         input_motion, motion, m_length, caption, tokens = data['input_motion'], data['motion'], data['length'], data['caption'], data['tokens']
         if self.learn_var:
             log_variance = data['log_variance']
+            logging.debug("Retrieved log_variance: %s", log_variance is not None)
+        else:
+            log_variance = None
         sent_len = data['cap_len']
 
         if self.dataset.mode == 'eval':
@@ -444,10 +457,11 @@ class CompMDMPGeneratedDataset(Dataset):
             renormed_input_motion = (denormed_input_motion - self.dataset.mean_for_eval) / self.dataset.std_for_eval
             input_motion = renormed_input_motion
 
-            normed_log_variance = log_variance
-            denormed_log_variance = self.dataset.t2m_dataset.inv_transform(normed_log_variance)
-            renormed_log_variance = (denormed_log_variance - self.dataset.mean_for_eval) / self.dataset.std_for_eval
-            log_variance = renormed_log_variance
+            if log_variance is not None:
+                normed_log_variance = log_variance
+                denormed_log_variance = self.dataset.t2m_dataset.inv_transform(normed_log_variance)
+                renormed_log_variance = (denormed_log_variance - self.dataset.mean_for_eval) / self.dataset.std_for_eval
+                log_variance = renormed_log_variance
 
         pos_one_hots = []
         word_embeddings = []
@@ -459,6 +473,8 @@ class CompMDMPGeneratedDataset(Dataset):
         word_embeddings = np.concatenate(word_embeddings, axis=0)
 
         if self.learn_var:
+            logging.debug('Returning with log_variance')
             return word_embeddings, pos_one_hots, caption, sent_len, input_motion, motion, log_variance, m_length, '_'.join(tokens)
         else:
-            return word_embeddings, pos_one_hots, caption, sent_len, input_motion, motion, m_length, '_'.join(tokens)
+            logging.debug('Returning without log_variance')
+            return word_embeddings, pos_one_hots, caption, sent_len, input_motion, motion, None, m_length, '_'.join(tokens)
