@@ -433,7 +433,7 @@ class CompMDMPGeneratedDataset(Dataset):
         return length
 
     def __getitem__(self, item):
-        logging.debug("Fetching item at index %d", item)
+        # logging.debug("Fetching item at index %d", item)
         data = self.generated_motion[item]
         # logging.debug("Data at index %d: %s", item, data)
 
@@ -457,11 +457,11 @@ class CompMDMPGeneratedDataset(Dataset):
             renormed_input_motion = (denormed_input_motion - self.dataset.mean_for_eval) / self.dataset.std_for_eval
             input_motion = renormed_input_motion
 
-            if log_variance is not None:
-                normed_log_variance = log_variance
-                denormed_log_variance = self.dataset.t2m_dataset.inv_transform(normed_log_variance)
-                renormed_log_variance = (denormed_log_variance - self.dataset.mean_for_eval) / self.dataset.std_for_eval
-                log_variance = renormed_log_variance
+            # if log_variance is not None:
+            #     normed_log_variance = log_variance
+            #     denormed_log_variance = self.dataset.t2m_dataset.inv_transform(normed_log_variance)
+            #     renormed_log_variance = (denormed_log_variance - self.dataset.mean_for_eval) / self.dataset.std_for_eval
+            #     log_variance = renormed_log_variance
 
         pos_one_hots = []
         word_embeddings = []

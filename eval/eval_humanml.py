@@ -32,15 +32,29 @@ def evaluate_mjpje(eval_wrapper, motion_loaders, file, learning_var, start_idx, 
                 if motion_loader_name == 'ground truth':
                     continue
                 else:
-                    _, _, _, _, input_motion, motion, _, _ = batch
+                    _, _, _, _, input_motion, motion, _, _, _ = batch
                 
-                B, nb_joints, _, nb_frames = input_motion.shape
+                print(input_motion.shape, motion.shape)
+                input_motion = input_motion.unsqueeze(1).float()
+                motion = motion.unsqueeze(1).float()
+                print(input_motion.shape, motion.shape)
+                
+                n_joints = 22 if input_motion.shape[3] == 263 else 21
+                input_motion = recover_from_ric(input_motion, n_joints)
+                input_motion = input_motion.view(-1, *input_motion.shape[2:]).permute(0, 2, 3, 1)
+
+                motion = recover_from_ric(motion, n_joints)
+                motion = motion.view(-1, *motion.shape[2:]).permute(0, 2, 3, 1)
 
                 # Convert to XYZ format
                 target_xyz = get_xyz(input_motion)  # (B, nb_joints, 3, nb_frames)
+                print(target_xyz.shape)
                 pred_xyz = get_xyz(motion)
+                print(pred_xyz.shape)
 
-                mask = torch.ones_like(target_xyz, dtype=torch.bool, device=target_xyz.device)
+                B, nb_joints, _, nb_frames = target_xyz.shape
+
+                mask = torch.ones_like(pred_xyz, dtype=torch.bool, device=target_xyz.device)
                 mask[:, :, :, :start_idx] = False
                 
                 target_xyz_reshaped = target_xyz.permute(0, 3, 1, 2).reshape(-1, nb_joints, 3)
@@ -48,8 +62,16 @@ def evaluate_mjpje(eval_wrapper, motion_loaders, file, learning_var, start_idx, 
                 mask_reshaped = mask.permute(0, 3, 1, 2).reshape(-1, nb_joints, 3)
 
                 # Apply the mask to filter out the relevant values
+                print(f"target_xyz_reshaped shape: {target_xyz_reshaped.shape}")
+                print(f"pred_xyz_reshaped shape: {pred_xyz_reshaped.shape}")
+                print(f"mask_reshaped shape: {mask_reshaped.shape}")
+
                 masked_target_xyz = target_xyz_reshaped[mask_reshaped]
                 masked_pred_xyz = pred_xyz_reshaped[mask_reshaped]
+
+                # Print shapes after masking
+                print(f"masked_target_xyz shape: {masked_target_xyz.shape}")
+                print(f"masked_pred_xyz shape: {masked_pred_xyz.shape}")
 
                 # Compute the per-joint position error for each frame
                 per_joint_errors = torch.norm(masked_target_xyz - masked_pred_xyz, dim=1)
@@ -266,13 +288,13 @@ def evaluation(eval_wrapper, gt_loader, eval_motion_loaders, log_file, replicati
             print(f'Time: {datetime.now()}', file=f, flush=True)
             mat_score_dict, R_precision_dict, acti_dict = evaluate_matching_score(eval_wrapper, motion_loaders, f)
 
-            print(f'Time: {datetime.now()}')
-            print(f'Time: {datetime.now()}', file=f, flush=True)
-            fid_score_dict = evaluate_fid(eval_wrapper, gt_loader, acti_dict, f)
+            # print(f'Time: {datetime.now()}')
+            # print(f'Time: {datetime.now()}', file=f, flush=True)
+            # fid_score_dict = evaluate_fid(eval_wrapper, gt_loader, acti_dict, f)
 
-            print(f'Time: {datetime.now()}')
-            print(f'Time: {datetime.now()}', file=f, flush=True)
-            div_score_dict = evaluate_diversity(acti_dict, f, diversity_times)
+            # print(f'Time: {datetime.now()}')
+            # print(f'Time: {datetime.now()}', file=f, flush=True)
+            # div_score_dict = evaluate_diversity(acti_dict, f, diversity_times)
 
             print(f'Time: {datetime.now()}')
             print(f'Time: {datetime.now()}', file=f, flush=True)
@@ -298,17 +320,17 @@ def evaluation(eval_wrapper, gt_loader, eval_motion_loaders, log_file, replicati
                 else:
                     all_metrics['R_precision'][key] += [item]
 
-            for key, item in fid_score_dict.items():
-                if key not in all_metrics['FID']:
-                    all_metrics['FID'][key] = [item]
-                else:
-                    all_metrics['FID'][key] += [item]
+            # for key, item in fid_score_dict.items():
+            #     if key not in all_metrics['FID']:
+            #         all_metrics['FID'][key] = [item]
+            #     else:
+            #         all_metrics['FID'][key] += [item]
 
-            for key, item in div_score_dict.items():
-                if key not in all_metrics['Diversity']:
-                    all_metrics['Diversity'][key] = [item]
-                else:
-                    all_metrics['Diversity'][key] += [item]
+            # for key, item in div_score_dict.items():
+            #     if key not in all_metrics['Diversity']:
+            #         all_metrics['Diversity'][key] = [item]
+            #     else:
+            #         all_metrics['Diversity'][key] += [item]
             
             for key, item in mjpje_dict.items():
                 if key not in all_metrics['Diversity']:
@@ -405,11 +427,9 @@ if __name__ == '__main__':
     model, diffusion = create_model_and_diffusion(args, gen_loader)
     learning_var = model.learning_var
     enc = model
-    get_xyz = lambda sample: enc.rot2xyz(sample, mask=None, pose_rep=enc.pose_rep, translation=enc.translation,
-                                             glob=enc.glob,
-                                             # jointstype='vertices',  # 3.4 iter/sec # USED ALSO IN MotionCLIP
-                                             jointstype='smpl',  # 3.4 iter/sec
-                                             vertstrans=False)
+    get_xyz = lambda sample : enc.rot2xyz(sample, mask=None, pose_rep='xyz', glob=True, translation=True,
+                               jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
+                               get_rotations_back=False)
 
     logger.log(f"Loading checkpoints from [{args.model_path}]...")
     state_dict = torch.load(args.model_path, map_location='cpu')

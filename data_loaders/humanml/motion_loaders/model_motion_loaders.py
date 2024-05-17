@@ -8,11 +8,11 @@ from torch.utils.data._utils.collate import default_collate
 
 
 def collate_fn(batch):
-    print(f"Batch before sorting: {batch}")  # Debug print
+    # print(f"Batch before sorting: {batch}")  # Debug print
     batch.sort(key=lambda x: x[3], reverse=True)
-    print(f"Batch after sorting: {batch}")  # Debug print
+    # print(f"Batch after sorting: {batch}")  # Debug print
     collated_batch = default_collate(batch)
-    print(f"Collated batch: {collated_batch}")  # Debug print
+    # print(f"Collated batch: {collated_batch}")  # Debug print
     return collated_batch
 
 
@@ -104,16 +104,16 @@ def get_mdmp_loader(model, diffusion, batch_size, ground_truth_loader, mm_num_sa
     }
     print('Generating %s ...' % opt['name'])
     dataset = CompMDMPGeneratedDataset(model, diffusion, ground_truth_loader, mm_num_samples, mm_num_repeats, max_motion_length, num_samples_limit, scale)
-    print('Generated CompMDMP Dataset Loading Completed!!!')
+    # print('Generated CompMDMP Dataset Loading Completed!!!')
 
     mm_dataset = MMGeneratedDataset(opt, dataset, ground_truth_loader.dataset.w_vectorizer)
-    print('Generated MM Dataset Loading Completed!!!')
+    # print('Generated MM Dataset Loading Completed!!!')
 
     # NOTE: bs must not be changed! this will cause a bug in R precision calc!
     motion_loader = DataLoader(dataset, batch_size=batch_size, collate_fn=collate_fn, drop_last=True, num_workers=4)
-    print('Generated CompMDMP DataLoader Loading Completed!!!')
+    # print('Generated CompMDMP DataLoader Loading Completed!!!')
     mm_motion_loader = DataLoader(mm_dataset, batch_size=1, num_workers=1)
 
-    print('Generated Dataset Loading Completed!!!')
+    # print('Generated Dataset Loading Completed!!!')
 
     return motion_loader, mm_motion_loader
