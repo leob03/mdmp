@@ -34,10 +34,10 @@ def evaluate_mjpje(eval_wrapper, motion_loaders, file, learning_var, start_idx, 
                 else:
                     _, _, _, _, input_motion, motion, _, _, _ = batch
                 
-                print(input_motion.shape, motion.shape)
+                print(input_motion.shape, motion.shape) # torch.Size([32, 196, 263]) torch.Size([32, 196, 263])
                 input_motion = input_motion.unsqueeze(1).float()
                 motion = motion.unsqueeze(1).float()
-                print(input_motion.shape, motion.shape)
+                print(input_motion.shape, motion.shape) # torch.Size([32, 1, 196, 263]) torch.Size([32, 1, 196, 263])
                 
                 n_joints = 22 if input_motion.shape[3] == 263 else 21
                 input_motion = recover_from_ric(input_motion, n_joints)
@@ -48,43 +48,46 @@ def evaluate_mjpje(eval_wrapper, motion_loaders, file, learning_var, start_idx, 
 
                 # Convert to XYZ format
                 target_xyz = get_xyz(input_motion)  # (B, nb_joints, 3, nb_frames)
-                print(target_xyz.shape)
+                print(target_xyz.shape) # torch.Size([32, 22, 3, 196])
                 pred_xyz = get_xyz(motion)
-                print(pred_xyz.shape)
+                print(pred_xyz.shape) # torch.Size([32, 22, 3, 196])
 
                 B, nb_joints, _, nb_frames = target_xyz.shape
 
                 mask = torch.ones_like(pred_xyz, dtype=torch.bool, device=target_xyz.device)
                 mask[:, :, :, :start_idx] = False
+
+                # Apply mask using element-wise multiplication
+                masked_target_xyz = target_xyz * mask.float()
+                masked_pred_xyz = pred_xyz * mask.float()
                 
-                target_xyz_reshaped = target_xyz.permute(0, 3, 1, 2).reshape(-1, nb_joints, 3)
-                pred_xyz_reshaped = pred_xyz.permute(0, 3, 1, 2).reshape(-1, nb_joints, 3)
-                mask_reshaped = mask.permute(0, 3, 1, 2).reshape(-1, nb_joints, 3)
+                target_xyz_reshaped = target_xyz.permute(0, 3, 1, 2).reshape(32, -1, 3)
+                pred_xyz_reshaped = pred_xyz.permute(0, 3, 1, 2).reshape(32, -1, 3)
 
                 # Apply the mask to filter out the relevant values
-                print(f"target_xyz_reshaped shape: {target_xyz_reshaped.shape}")
-                print(f"pred_xyz_reshaped shape: {pred_xyz_reshaped.shape}")
-                print(f"mask_reshaped shape: {mask_reshaped.shape}")
-
-                masked_target_xyz = target_xyz_reshaped[mask_reshaped]
-                masked_pred_xyz = pred_xyz_reshaped[mask_reshaped]
-
-                # Print shapes after masking
-                print(f"masked_target_xyz shape: {masked_target_xyz.shape}")
-                print(f"masked_pred_xyz shape: {masked_pred_xyz.shape}")
+                print(f"target_xyz_reshaped shape: {target_xyz_reshaped.shape}") # torch.Size([32, 196*22, 3])
+                print(f"pred_xyz_reshaped shape: {pred_xyz_reshaped.shape}") # torch.Size([32, 196*22, 3])
 
                 # Compute the per-joint position error for each frame
-                per_joint_errors = torch.norm(masked_target_xyz - masked_pred_xyz, dim=1)
-                errors_reshaped = per_joint_errors.reshape(B, nb_frames - start_idx, nb_joints).mean(dim=2)  # Mean over joints
+                per_joint_errors = torch.norm(masked_target_xyz - masked_pred_xyz, 2, 2)
+                print(f"per_joint_errors shape: {per_joint_errors.shape}") # torch.Size([32, 196*22])
+
+                errors_reshaped = per_joint_errors.mean(dim=0)  # Mean over batch
+                print(f"errors_reshaped shape: {errors_reshaped.shape}") # torch.Size([196*22])
 
                 # Compute the mean error across all joints and frames for overall MPJPE
-                mean_3d_err = errors_reshaped.mean()
+                overtime_3d_err = errors_reshaped.reshape(-1, nb_joints).mean(dim=1)
+                print(f"overtime_3d_err shape: {overtime_3d_err.shape}") # torch.Size([196])
+
+                mean_3d_err = overtime_3d_err.mean()
+                print(f"mean_3d_err shape: {mean_3d_err.shape}") # torch.Size([])
+
                 mean_errors.append(mean_3d_err.item())
 
                 # Compute MPJPE at specific time frames
                 for idx, frame_idx in enumerate(frame_indices):
                     if frame_idx < nb_frames - start_idx:
-                        mpjpe_at_time = errors_reshaped[:, frame_idx].mean()  # Average across the batch
+                        mpjpe_at_time = overtime_3d_err[frame_idx].mean()
                         mpjpe_specific_times[idx].append(mpjpe_at_time.item())
 
         mjpje_dict[motion_loader_name] = sum(mean_errors) / len(mean_errors) if mean_errors else float('inf')
@@ -413,7 +416,7 @@ if __name__ == '__main__':
     else:
         raise ValueError()
 
-
+    print("eval mode is:" ,args.eval_mode)
     dist_util.setup_dist(args.device)
     logger.configure()
 
