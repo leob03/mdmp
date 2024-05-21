@@ -15,6 +15,7 @@ from train.train_platforms import ClearmlPlatform, TensorboardPlatform, NoPlatfo
 
 def main():
     args = train_args()
+    print(f'Args: %s' % args)
     fixseed(args.seed)
     train_platform_type = eval(args.train_platform_type)
     train_platform = train_platform_type(args.save_dir)

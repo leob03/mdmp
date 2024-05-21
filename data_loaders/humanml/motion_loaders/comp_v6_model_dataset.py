@@ -440,7 +440,7 @@ class CompMDMPGeneratedDataset(Dataset):
         input_motion, motion, m_length, caption, tokens = data['input_motion'], data['motion'], data['length'], data['caption'], data['tokens']
         if self.learn_var:
             log_variance = data['log_variance']
-            logging.debug("Retrieved log_variance: %s", log_variance is not None)
+            # logging.debug("Retrieved log_variance: %s", log_variance is not None)
         else:
             log_variance = None
         sent_len = data['cap_len']
@@ -473,8 +473,8 @@ class CompMDMPGeneratedDataset(Dataset):
         word_embeddings = np.concatenate(word_embeddings, axis=0)
 
         if self.learn_var:
-            logging.debug('Returning with log_variance')
+            # logging.debug('Returning with log_variance')
             return word_embeddings, pos_one_hots, caption, sent_len, input_motion, motion, log_variance, m_length, '_'.join(tokens)
         else:
-            logging.debug('Returning without log_variance')
+            # logging.debug('Returning without log_variance')
             return word_embeddings, pos_one_hots, caption, sent_len, input_motion, motion, None, m_length, '_'.join(tokens)
