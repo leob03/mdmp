@@ -40,7 +40,7 @@ def evaluate_mpjpe(eval_wrapper, motion_loaders, file, learning_var, start_idx, 
                     _, _, _, _, input_motion, motion, _, _, _ = batch
                 
                 logging.debug('batch_ix: %d', idx)
-                logging.debug('motion shape: %d', motion.shape)
+                logging.debug('motion shape: %s', motion.shape)
                 logging.debug('motion: %s', motion)
                 input_motion = input_motion.unsqueeze(1).float() # torch.Size([32, 1, 196, 263])
                 motion = motion.unsqueeze(1).float() # torch.Size([32, 1, 196, 263])
