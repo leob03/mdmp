@@ -477,4 +477,5 @@ class CompMDMPGeneratedDataset(Dataset):
             return word_embeddings, pos_one_hots, caption, sent_len, input_motion, motion, log_variance, m_length, '_'.join(tokens)
         else:
             # logging.debug('Returning without log_variance')
-            return word_embeddings, pos_one_hots, caption, sent_len, input_motion, motion, None, m_length, '_'.join(tokens)
+            log_variance = np.zeros_like(input_motion)
+            return word_embeddings, pos_one_hots, caption, sent_len, input_motion, motion, log_variance, m_length, '_'.join(tokens)
