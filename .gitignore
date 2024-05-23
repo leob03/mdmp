@@ -142,3 +142,5 @@ body_models/smpl/kintree_table.pkl
 body_models/smpl/SMPL_NEUTRAL.pkl
 
 body_models/smpl/smplfaces.npy
+
+logs/
