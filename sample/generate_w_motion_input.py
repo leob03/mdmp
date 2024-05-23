@@ -121,6 +121,7 @@ def main():
         model_kwargs['y']['motion_embed'] = input_motions
         model_kwargs['y']['motion_embed_mask'] = torch.ones_like(input_motions, dtype=torch.bool, device=input_motions.device)
         start_idx = args.emb_motion_len
+        print(input_motions.shape)
         model_kwargs['y']['motion_embed_mask'][:, :, :, start_idx:] = False
         sample_fn = diffusion.p_sample_loop
 

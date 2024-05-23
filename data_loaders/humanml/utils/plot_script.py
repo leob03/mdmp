@@ -245,17 +245,17 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
             if i < 5:
                 linewidth = 4.0
             else:
-                linewidth = 2.0
-            if index > emb_motion_len:
-                ax.plot3D(data[index, chain, 0], data[index, chain, 1], data[index, chain, 2], linewidth=linewidth, color=color_orange)
-
+                linewidth = 2.0       
+            ax.plot3D(gt_data[index, chain, 0], gt_data[index, chain, 1], gt_data[index, chain, 2], linewidth=linewidth, color=color_blue)
+        
         for i, (chain, color_orange, color_blue) in enumerate(zip(kinematic_tree, colors_orange, colors_blue)):
             if i < 5:
                 linewidth = 4.0
             else:
-                linewidth = 2.0       
-            ax.plot3D(gt_data[index, chain, 0], gt_data[index, chain, 1], gt_data[index, chain, 2], linewidth=linewidth, color=color_blue)
-        
+                linewidth = 2.0
+            # if index > emb_motion_len:
+            ax.plot3D(data[index, chain, 0], data[index, chain, 1], data[index, chain, 2], linewidth=linewidth, color=color_orange)
+
         # if gt_data is not None:
         #     gt_motion = gt_data[index]
         #     # Check if it's a tensor or numpy array and handle reshaping accordingly
@@ -283,14 +283,14 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
         specific_joints_indices = [3, 7, 8, 12, 20, 21]
 
         # Draw spheres around specific joints
-        if index > emb_motion_len:
-            if variance is not None:
-                for joint_idx in specific_joints_indices:
-                    joint_position = data[index, joint_idx]
-                    # joint_variance = np.exp(np.mean(variance[index, joint_idx]))  # Convert log variance to actual variance
-                    joint_variance = np.exp(np.mean(variance[index, joint_idx])) * 0.3
-                    radius = np.sqrt(joint_variance) / 3  # Simplified radius calculation
-                    draw_sphere(joint_position, radius, color='c', alpha=0.1)
+        # if index > emb_motion_len:
+        if variance is not None:
+            for joint_idx in specific_joints_indices:
+                joint_position = data[index, joint_idx]
+                # joint_variance = np.exp(np.mean(variance[index, joint_idx]))  # Convert log variance to actual variance
+                joint_variance = np.exp(np.mean(variance[index, joint_idx])) * 0.3
+                radius = np.sqrt(joint_variance) / 3  # Simplified radius calculation
+                draw_sphere(joint_position, radius, color='c', alpha=0.1)
 
     ani = FuncAnimation(fig, update, frames=frame_number, interval=1000 / fps, repeat=False)
 
