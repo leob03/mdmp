@@ -22,6 +22,7 @@ from data_loaders.tensors import collate
 
 def main():
     args = generate_args()
+    print(f'Args: %s' % args)
     fixseed(args.seed)
     out_path = args.output_dir
     name = os.path.basename(os.path.dirname(args.model_path))

@@ -82,8 +82,8 @@ def evaluate_mpjpe(eval_wrapper, motion_loaders, file, learning_var, start_idx, 
                 # masked_target_xyz = target_xyz * mask.float()
                 # masked_pred_xyz = pred_xyz * mask.float()
 
-                target_xyz = target_xyz[:, :, :,start_idx:]  # (B, nb_joints, 3, nb_frames - start_idx)
-                pred_xyz = pred_xyz[:, :, :,start_idx:]
+                # target_xyz = target_xyz[:, :, :,start_idx:]  # (B, nb_joints, 3, nb_frames - start_idx)
+                # pred_xyz = pred_xyz[:, :, :,start_idx:]
                 
                 target_xyz_reshaped = target_xyz.permute(0, 3, 1, 2).reshape(32, -1, 3)
                 pred_xyz_reshaped = pred_xyz.permute(0, 3, 1, 2).reshape(32, -1, 3)
@@ -402,6 +402,7 @@ def evaluation(eval_wrapper, gt_loader, eval_motion_loaders, log_file, replicati
 
 if __name__ == '__main__':
     args = evaluation_parser()
+    print(f'Args: %s' % args)
     fixseed(args.seed)
     args.batch_size = 32 # This must be 32! Don't change it! otherwise it will cause a bug in R precision calc!
     start_idx = args.emb_motion_len
@@ -477,7 +478,7 @@ if __name__ == '__main__':
         ################
         'vald': lambda: get_mdmp_loader(
             model, diffusion, args.batch_size,
-            gen_loader, mm_num_samples, mm_num_repeats, gt_loader.dataset.opt.max_motion_length, num_samples_limit, args.guidance_param
+            gen_loader, mm_num_samples, mm_num_repeats, gt_loader.dataset.opt.max_motion_length, num_samples_limit, args.guidance_param, start_idx
         )
     }
 

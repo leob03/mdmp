@@ -61,14 +61,14 @@ def add_base_options(parser):
     group.add_argument("--device", default=0, type=int, help="Device id to use.")
     group.add_argument("--seed", default=10, type=int, help="For fixing random seed.")
     group.add_argument("--batch_size", default=64, type=int, help="Batch size during training.")
-    group.add_argument("--learning_var", default=True, type=bool, help="If True, will learn the variance during the diffusion process.")
+    group.add_argument("--learning_var", default=False, type=bool, help="If True, will learn the variance during the diffusion process.")
 
 
 def add_diffusion_options(parser):
     group = parser.add_argument_group('diffusion')
     group.add_argument("--noise_schedule", default='cosine', choices=['linear', 'cosine'], type=str,
                        help="Noise schedule type")
-    group.add_argument("--diffusion_steps", default=50, type=int,
+    group.add_argument("--diffusion_steps", default=1000, type=int,
                        help="Number of diffusion steps (denoted T in the paper)")
     group.add_argument("--sigma_small", default=True, type=bool, help="Use smaller sigma values.")
 

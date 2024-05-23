@@ -299,7 +299,7 @@ class CompV6GeneratedDataset(Dataset):
 
 class CompMDMPGeneratedDataset(Dataset):
 
-    def __init__(self, model, diffusion, dataloader, mm_num_samples, mm_num_repeats, max_motion_length, num_samples_limit, scale=1.):
+    def __init__(self, model, diffusion, dataloader, mm_num_samples, mm_num_repeats, max_motion_length, num_samples_limit, start_idx, scale=1.):
         self.dataloader = dataloader
         # self.learn_var = diffusion.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]
         self.learn_var = diffusion.model_var_type.value in [ModelVarType.LEARNED.value, ModelVarType.LEARNED_RANGE.value]
@@ -331,7 +331,7 @@ class CompMDMPGeneratedDataset(Dataset):
 
         with torch.no_grad():
             for i, (motion, model_kwargs) in tqdm(enumerate(dataloader)):
-
+                motion = motion.to(dist_util.dev())
                 if num_samples_limit is not None and len(generated_motion) >= num_samples_limit:
                     break
 
@@ -342,6 +342,9 @@ class CompMDMPGeneratedDataset(Dataset):
                     model_kwargs['y']['scale'] = torch.ones(motion.shape[0],
                                                             device=dist_util.dev()) * scale
 
+                model_kwargs['y']['motion_embed'] = motion
+                model_kwargs['y']['motion_embed_mask'] = torch.ones_like(motion, dtype=torch.bool, device=motion.device)
+                model_kwargs['y']['motion_embed_mask'][:, :, :, start_idx:] = False
                 mm_num_now = len(mm_generated_motions) // dataloader.batch_size
                 is_mm = i in mm_idxs
                 repeat_times = mm_num_repeats if is_mm else 1

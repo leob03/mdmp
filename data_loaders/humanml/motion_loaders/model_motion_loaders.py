@@ -98,12 +98,12 @@ def get_motion_loader(opt_path, batch_size, ground_truth_dataset, mm_num_samples
 
 #     return motion_loader, mm_motion_loader
 
-def get_mdmp_loader(model, diffusion, batch_size, ground_truth_loader, mm_num_samples, mm_num_repeats, max_motion_length, num_samples_limit, scale):
+def get_mdmp_loader(model, diffusion, batch_size, ground_truth_loader, mm_num_samples, mm_num_repeats, max_motion_length, num_samples_limit, scale, start_idx):
     opt = {
         'name': 'test',  # FIXME
     }
     print('Generating %s ...' % opt['name'])
-    dataset = CompMDMPGeneratedDataset(model, diffusion, ground_truth_loader, mm_num_samples, mm_num_repeats, max_motion_length, num_samples_limit, scale)
+    dataset = CompMDMPGeneratedDataset(model, diffusion, ground_truth_loader, mm_num_samples, mm_num_repeats, max_motion_length, num_samples_limit, start_idx, scale)
     # print('Generated CompMDMP Dataset Loading Completed!!!')
 
     mm_dataset = MMGeneratedDataset(opt, dataset, ground_truth_loader.dataset.w_vectorizer)
