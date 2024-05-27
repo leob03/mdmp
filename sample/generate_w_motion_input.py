@@ -11,7 +11,7 @@ from utils.parser_util import generate_args
 from utils.model_util import create_model_and_diffusion, load_model_wo_clip
 from utils import dist_util
 from model.cfg_sampler import ClassifierFreeSampleModel
-from data_loaders.get_data import get_dataset_loader
+from data_loaders.get_data import get_dataset_loader, get_collate_fn
 from data_loaders.humanml.scripts.motion_process import recover_from_ric
 import data_loaders.humanml.utils.paramUtil as paramUtil
 from data_loaders.humanml.utils.plot_script import plot_3d_motion
@@ -73,8 +73,22 @@ def main():
                               batch_size=args.batch_size,
                               num_frames=max_frames,
                               split='test',
-                              hml_mode='train')  # in train mode, you get both text and motion.
+                            #   hml_mode='train') # in train mode, you get both text and motion.
+                              hml_mode='eval')  
     total_num_samples = args.num_samples * args.num_repetitions
+
+    # Use the subset data loader
+    print("Extracting sequences from the end of the dataset...")
+    total_samples = len(data.dataset)
+    start_index = total_samples - args.num_samples
+    subset_indices = list(range(start_index, total_samples))
+    subset_dataset = torch.utils.data.Subset(data.dataset, subset_indices)
+    subset_data_loader = torch.utils.data.DataLoader(subset_dataset, 
+                                                    batch_size=args.batch_size, 
+                                                    shuffle=False, 
+                                                    num_workers=8, 
+                                                    collate_fn=get_collate_fn(args.dataset, 'eval'))
+
 
     print("Creating model and diffusion...")
     model, diffusion = create_model_and_diffusion(args, data)
@@ -89,10 +103,12 @@ def main():
     model.eval()  # disable random masking
 
     if is_using_data:
-        iterator = iter(data)
+        iterator = iter(subset_data_loader)
+        # word_embeddings, pos_one_hots, caption, sent_len, motion, m_length, join_tokens = next(iterator)
         input_motions, model_kwargs = next(iterator)
         input_motions = input_motions.to(dist_util.dev())
         # print(model_kwargs['y']['text'])
+        # raise SystemExit
     else:
         collate_args = [{'inp': torch.zeros(n_frames), 'tokens': None, 'lengths': n_frames}] * args.num_samples
         is_t2m = any([args.input_text, args.text_prompt])
@@ -112,6 +128,21 @@ def main():
     all_lengths = []
     all_text = []
 
+    start_idx = args.emb_motion_len
+
+    # model_kwargs['y']['inpainted_motion'] = input_motions
+    # # print(f'Input motion shape: {input_motions.shape}') # [bs, njoints, 1, seqlen]
+    # model_kwargs['y']['inpainting_mask'] = torch.ones_like(input_motions, dtype=torch.bool,
+    #                                                         device=input_motions.device)  # True means use gt motion
+    # for i, length in enumerate(model_kwargs['y']['lengths'].cpu().numpy()):
+    #     model_kwargs['y']['inpainting_mask'][i, :, :, 50:] = False  # do inpainting in those frames
+
+    times_ms = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9]  # in seconds
+    # frame_indices = [int(20 * (t / 1000.0)) - start_idx for t in times_ms]
+    frame_indices = [int(20 * t) for t in times_ms]
+    mean_errors = []
+    mpjpe_specific_times = [[] for _ in times_ms]  # List to store MPJPE at specific times
+
     for rep_i in range(args.num_repetitions):
         print(f'### Sampling [repetitions #{rep_i}]')
 
@@ -120,10 +151,10 @@ def main():
             model_kwargs['y']['scale'] = torch.ones(args.batch_size, device=dist_util.dev()) * args.guidance_param
         model_kwargs['y']['motion_embed'] = input_motions
         model_kwargs['y']['motion_embed_mask'] = torch.ones_like(input_motions, dtype=torch.bool, device=input_motions.device)
-        start_idx = args.emb_motion_len
-        print(input_motions.shape)
         model_kwargs['y']['motion_embed_mask'][:, :, :, start_idx:] = False
         sample_fn = diffusion.p_sample_loop
+
+
 
         if args.learning_var:
             sample, log_variance = sample_fn(
@@ -189,6 +220,22 @@ def main():
         input_motions_reshaped = model.rot2xyz(x=input_motions_reshaped, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
                                   jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
                                   get_rotations_back=False)
+        
+        # Compute MPJPE
+        B, nb_joints, _, nb_frames = input_motions_reshaped.shape
+        target_xyz_reshaped = input_motions_reshaped.permute(0, 3, 1, 2).reshape(args.num_samples, -1, 3)
+        pred_xyz_reshaped = sample.permute(0, 3, 1, 2).reshape(args.num_samples, -1, 3)
+        per_joint_errors = torch.norm(target_xyz_reshaped - pred_xyz_reshaped, 2, 2) # torch.Size([32, 196*22])
+        errors_reshaped = per_joint_errors.mean(dim=0)  # Mean over batch #torch.Size([196*22])
+        overtime_3d_err = errors_reshaped.reshape(-1, nb_joints).mean(dim=1)  # torch.Size([196])
+        mean_3d_err = overtime_3d_err.mean() # torch.Size([])
+        mean_errors.append(mean_3d_err.item())
+
+        # Compute MPJPE at specific time frames
+        for idx, frame_idx in enumerate(frame_indices):
+            if frame_idx < nb_frames - start_idx:
+                mpjpe_at_time = overtime_3d_err[frame_idx]
+                mpjpe_specific_times[idx].append(mpjpe_at_time.item())
 
         if args.unconstrained:
             all_text += ['unconstrained'] * args.num_samples
@@ -203,7 +250,12 @@ def main():
 
         print(f"created {len(all_motions) * args.batch_size} samples")
 
-
+    mpjpe = sum(mean_errors) / len(mean_errors) if mean_errors else float('inf')
+    print(f'---> Overall MPJPE = {mpjpe*1000:.4f}')
+    for time_ms, errors_at_time in zip(times_ms, mpjpe_specific_times):
+        if errors_at_time:
+            avg_error = sum(errors_at_time) / len(errors_at_time)
+            print(f'---> MPJPE at {time_ms} s = {avg_error*1000:.4f}')
     all_motions = np.concatenate(all_motions, axis=0)
     # print(f"all_motions shape 1: {all_motions.shape}") (30, 22, 3, 196)
     all_motions = all_motions[:total_num_samples]  # [bs, njoints, 6, seqlen]

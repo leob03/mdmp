@@ -324,6 +324,21 @@ class GaussianDiffusion:
                     model_log_variance = frac * max_log + (1 - frac) * min_log
                     model_variance = th.exp(model_log_variance)
 
+            else:
+                model_variance, model_log_variance = {
+                    # for fixedlarge, we set the initial (log-)variance like so
+                    # to get a better decoder log likelihood.
+                    ModelVarType.FIXED_LARGE: (
+                        np.append(self.posterior_variance[1], self.betas[1:]),
+                        np.log(np.append(self.posterior_variance[1], self.betas[1:])),
+                    ),
+                    ModelVarType.FIXED_SMALL: (
+                        self.posterior_variance,
+                        self.posterior_log_variance_clipped,
+                    ),
+                }[self.model_var_type]
+                model_variance = _extract_into_tensor(model_variance, t, x.shape)
+                model_log_variance = _extract_into_tensor(model_log_variance, t, x.shape)
             # Once split is handled, we can perform the inpainting operation
             assert model_output.shape == inpainting_mask.shape == inpainted_motion.shape
             model_output = (model_output * ~inpainting_mask) + (inpainted_motion * inpainting_mask)
@@ -384,6 +399,7 @@ class GaussianDiffusion:
         else:
             raise NotImplementedError(self.model_mean_type)
 
+        # print(model_mean.shape, model_log_variance.shape, pred_xstart.shape, x.shape)
         assert (
             model_mean.shape == model_log_variance.shape == pred_xstart.shape == x.shape
         )

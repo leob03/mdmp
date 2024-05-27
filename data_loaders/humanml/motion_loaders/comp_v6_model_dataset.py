@@ -359,7 +359,7 @@ class CompMDMPGeneratedDataset(Dataset):
                             model_kwargs=model_kwargs,
                             skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
                             init_image=None,
-                            progress=False,
+                            progress=True,
                             dump_steps=None,
                             noise=None,
                             const_noise=False,
@@ -449,16 +449,19 @@ class CompMDMPGeneratedDataset(Dataset):
         sent_len = data['cap_len']
 
         if self.dataset.mode == 'eval':
-            normed_motion = motion
-            denormed_motion = self.dataset.t2m_dataset.inv_transform(normed_motion)
-            renormed_motion = (denormed_motion - self.dataset.mean_for_eval) / self.dataset.std_for_eval  # according to T2M norms
-            motion = renormed_motion
-            # This step is needed because T2M evaluators expect their norm convention
+            # normed_motion = motion
+            # denormed_motion = self.dataset.t2m_dataset.inv_transform(normed_motion)
+            # renormed_motion = (denormed_motion - self.dataset.mean_for_eval) / self.dataset.std_for_eval  # according to T2M norms
+            # motion = renormed_motion
+            # # This step is needed because T2M evaluators expect their norm convention
 
-            normed_input_motion = input_motion
-            denormed_input_motion = self.dataset.t2m_dataset.inv_transform(normed_input_motion)
-            renormed_input_motion = (denormed_input_motion - self.dataset.mean_for_eval) / self.dataset.std_for_eval
-            input_motion = renormed_input_motion
+            # normed_input_motion = input_motion
+            # denormed_input_motion = self.dataset.t2m_dataset.inv_transform(normed_input_motion)
+            # renormed_input_motion = (denormed_input_motion - self.dataset.mean_for_eval) / self.dataset.std_for_eval
+            # input_motion = renormed_input_motion
+
+            motion = self.dataset.t2m_dataset.inv_transform(motion)
+            input_motion = self.dataset.t2m_dataset.inv_transform(input_motion)
 
             # if log_variance is not None:
             #     normed_log_variance = log_variance

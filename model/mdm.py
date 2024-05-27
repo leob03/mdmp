@@ -187,7 +187,6 @@ class MDM(nn.Module):
 
         if 'motion_embed' in y.keys() and 'motion_embed_mask' in y.keys():
             # print('motion_embed' in y.keys(), "multi-modal input detected")
-
             motion_embed, motion_embed_mask = y['motion_embed'], y['motion_embed_mask']
             assert x.shape == motion_embed.shape == motion_embed_mask.shape
             x = (x * ~motion_embed_mask) + (motion_embed * motion_embed_mask)
