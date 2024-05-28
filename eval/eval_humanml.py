@@ -26,11 +26,12 @@ def evaluate_mpjpe(eval_wrapper, motion_loaders, file, learning_var, start_idx, 
     mpjpe_dict = OrderedDict({})
     print('========== Evaluating MPJPE ==========')
 
-    times_ms = [400, 1000, 1500, 2000]  # in milliseconds
-    frame_indices = [int(20 * (t / 1000.0)) - start_idx for t in times_ms]  # convert ms to frame index, adjust for start_idx
+    times_ms = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]  # in seconds
+    frame_indices = [int(20 * t) for t in times_ms]
+    mpjpe_specific_times = [[] for _ in times_ms]  # List to store MPJPE at specific times
 
     for motion_loader_name, motion_loader in motion_loaders.items():
-        mean_errors = []
+        # mean_errors = []
         mpjpe_specific_times = [[] for _ in times_ms]  # List to store MPJPE at specific times
         with torch.no_grad():
             for idx, batch in enumerate(motion_loader):
@@ -105,72 +106,29 @@ def evaluate_mpjpe(eval_wrapper, motion_loaders, file, learning_var, start_idx, 
                 if torch.isnan(overtime_3d_err).any() or torch.isinf(overtime_3d_err).any():
                     print(f"NaN or Inf found in overtime_3d_err at batch {idx}")
 
-                mean_3d_err = overtime_3d_err.mean() # torch.Size([])
+                # mean_3d_err = overtime_3d_err.mean() # torch.Size([])
 
-                if torch.isnan(mean_3d_err).any() or torch.isinf(mean_3d_err).any():
-                    print(f"NaN or Inf found in mean_3d_err at batch {idx}")
+                # if torch.isnan(mean_3d_err).any() or torch.isinf(mean_3d_err).any():
+                #     print(f"NaN or Inf found in mean_3d_err at batch {idx}")
 
-                mean_errors.append(mean_3d_err.item())
+                # mean_errors.append(mean_3d_err.item())
 
                 # Compute MPJPE at specific time frames
                 for idx, frame_idx in enumerate(frame_indices):
-                    if frame_idx < nb_frames - start_idx:
+                    if frame_idx < nb_frames:
                         mpjpe_at_time = overtime_3d_err[frame_idx]
                         mpjpe_specific_times[idx].append(mpjpe_at_time.item())
 
-        mpjpe_dict[motion_loader_name] = sum(mean_errors) / len(mean_errors) if mean_errors else float('inf')
-        print(f'---> [{motion_loader_name}]: Overall MPJPE = {mpjpe_dict[motion_loader_name]:.4f}')
+        avg_error_onesec = (sum(mpjpe_specific_times[6]) / len(mpjpe_specific_times[6]))*1000
+        mpjpe_dict[motion_loader_name] = avg_error_onesec if mpjpe_specific_times[6] else float('inf')
+        # print(f'---> [{motion_loader_name}]: Overall MPJPE = {mpjpe_dict[motion_loader_name]:.4f}')
         for time_ms, errors_at_time in zip(times_ms, mpjpe_specific_times):
             if errors_at_time:
                 avg_error = sum(errors_at_time) / len(errors_at_time)
-                print(f'---> [{motion_loader_name}]: MPJPE at {time_ms} ms = {avg_error:.4f}')
-                print(f'---> [{motion_loader_name}]: MPJPE at {time_ms} ms = {avg_error:.4f}', file=file, flush=True)
+                print(f'---> [{motion_loader_name}]: MPJPE at {time_ms} s = {avg_error*1000:.4f}')
+                print(f'---> [{motion_loader_name}]: MPJPE at {time_ms} s = {avg_error*1000:.4f}', file=file, flush=True)
 
     return mpjpe_dict
-
-# def evaluate_ngll(eval_wrapper, motion_loaders, file, learning_var, start_idx, get_xyz):
-#     mjpje_dict = OrderedDict({})
-#     print('========== Evaluating NGLL ==========')
-
-#     for motion_loader_name, motion_loader in motion_loaders.items():
-#         mean_errors = []
-#         with torch.no_grad():
-#             for idx, batch in enumerate(motion_loader):
-#                 if learning_var:
-#                     _, _, _, _, input_motion, motion, log_variance, _, _ = batch -------> here
-#                 else:
-#                     _, _, _, _, input_motion, motion, _, _ = batch
-                
-#                 B, nb_joints, _, nb_frames = input_motion.shape
-
-#                 # Convert to XYZ format
-#                 target_xyz = get_xyz(input_motion)  # (B, nb_joints, 3, nb_frames)
-#                 pred_xyz = get_xyz(motion)
-
-#                 mask = torch.ones_like(target_xyz, dtype=torch.bool, device=target_xyz.device)
-#                 mask[:, :, :, :start_idx] = False
-                
-#                 target_xyz_reshaped = target_xyz.permute(0, 3, 1, 2).reshape(-1, nb_joints, 3)
-#                 pred_xyz_reshaped = pred_xyz.permute(0, 3, 1, 2).reshape(-1, nb_joints, 3)
-#                 mask_reshaped = mask.permute(0, 3, 1, 2).reshape(-1, nb_joints, 3)
-
-#                 # Apply the mask to filter out the relevant values
-#                 masked_target_xyz = target_xyz_reshaped[mask_reshaped]
-#                 masked_pred_xyz = pred_xyz_reshaped[mask_reshaped]
-
-#                 # Compute the per-joint position error for each frame
-#                 per_joint_errors = torch.norm(masked_target_xyz - masked_pred_xyz, dim=1)
-
-#                 # Compute the mean error across all joints and frames
-#                 mean_3d_err = torch.mean(per_joint_errors)
-#                 mean_errors.append(mean_3d_err.item())
-
-#         mjpje_dict[motion_loader_name] = sum(mean_errors) / len(mean_errors) if mean_errors else float('inf')
-
-#         print(f'---> [{motion_loader_name}]: MJPJE = {mjpje_dict[motion_loader_name]:.4f}')
-#         print(f'---> [{motion_loader_name}]: MJPJE = {mjpje_dict[motion_loader_name]:.4f}', file=file, flush=True)
-
-#     return mjpje_dict
 
 
 def evaluate_matching_score(eval_wrapper, motion_loaders, file):
@@ -320,13 +278,13 @@ def evaluation(eval_wrapper, gt_loader, eval_motion_loaders, log_file, replicati
             print(f'Time: {datetime.now()}', file=f, flush=True)
             mat_score_dict, R_precision_dict, acti_dict = evaluate_matching_score(eval_wrapper, motion_loaders, f)
 
-            # print(f'Time: {datetime.now()}')
-            # print(f'Time: {datetime.now()}', file=f, flush=True)
-            # fid_score_dict = evaluate_fid(eval_wrapper, gt_loader, acti_dict, f)
+            print(f'Time: {datetime.now()}')
+            print(f'Time: {datetime.now()}', file=f, flush=True)
+            fid_score_dict = evaluate_fid(eval_wrapper, gt_loader, acti_dict, f)
 
-            # print(f'Time: {datetime.now()}')
-            # print(f'Time: {datetime.now()}', file=f, flush=True)
-            # div_score_dict = evaluate_diversity(acti_dict, f, diversity_times)
+            print(f'Time: {datetime.now()}')
+            print(f'Time: {datetime.now()}', file=f, flush=True)
+            div_score_dict = evaluate_diversity(acti_dict, f, diversity_times)
 
             print(f'Time: {datetime.now()}')
             print(f'Time: {datetime.now()}', file=f, flush=True)
@@ -352,17 +310,17 @@ def evaluation(eval_wrapper, gt_loader, eval_motion_loaders, log_file, replicati
                 else:
                     all_metrics['R_precision'][key] += [item]
 
-            # for key, item in fid_score_dict.items():
-            #     if key not in all_metrics['FID']:
-            #         all_metrics['FID'][key] = [item]
-            #     else:
-            #         all_metrics['FID'][key] += [item]
+            for key, item in fid_score_dict.items():
+                if key not in all_metrics['FID']:
+                    all_metrics['FID'][key] = [item]
+                else:
+                    all_metrics['FID'][key] += [item]
 
-            # for key, item in div_score_dict.items():
-            #     if key not in all_metrics['Diversity']:
-            #         all_metrics['Diversity'][key] = [item]
-            #     else:
-            #         all_metrics['Diversity'][key] += [item]
+            for key, item in div_score_dict.items():
+                if key not in all_metrics['Diversity']:
+                    all_metrics['Diversity'][key] = [item]
+                else:
+                    all_metrics['Diversity'][key] += [item]
             
             for key, item in mpjpe_dict.items():
                 if key not in all_metrics['MPJPE']:

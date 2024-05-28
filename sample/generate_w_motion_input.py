@@ -137,10 +137,10 @@ def main():
     # for i, length in enumerate(model_kwargs['y']['lengths'].cpu().numpy()):
     #     model_kwargs['y']['inpainting_mask'][i, :, :, 50:] = False  # do inpainting in those frames
 
-    times_ms = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9]  # in seconds
+    times_ms = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]  # in seconds
     # frame_indices = [int(20 * (t / 1000.0)) - start_idx for t in times_ms]
     frame_indices = [int(20 * t) for t in times_ms]
-    mean_errors = []
+    # mean_errors = []
     mpjpe_specific_times = [[] for _ in times_ms]  # List to store MPJPE at specific times
 
     for rep_i in range(args.num_repetitions):
@@ -229,11 +229,11 @@ def main():
         errors_reshaped = per_joint_errors.mean(dim=0)  # Mean over batch #torch.Size([196*22])
         overtime_3d_err = errors_reshaped.reshape(-1, nb_joints).mean(dim=1)  # torch.Size([196])
         mean_3d_err = overtime_3d_err.mean() # torch.Size([])
-        mean_errors.append(mean_3d_err.item())
+        # mean_errors.append(mean_3d_err.item())
 
         # Compute MPJPE at specific time frames
         for idx, frame_idx in enumerate(frame_indices):
-            if frame_idx < nb_frames - start_idx:
+            if frame_idx < nb_frames:
                 mpjpe_at_time = overtime_3d_err[frame_idx]
                 mpjpe_specific_times[idx].append(mpjpe_at_time.item())
 
@@ -250,12 +250,16 @@ def main():
 
         print(f"created {len(all_motions) * args.batch_size} samples")
 
-    mpjpe = sum(mean_errors) / len(mean_errors) if mean_errors else float('inf')
-    print(f'---> Overall MPJPE = {mpjpe*1000:.4f}')
+    # mpjpe = sum(mean_errors) / len(mean_errors) if mean_errors else float('inf')
+    # print(f'---> Overall MPJPE = {mpjpe*1000:.4f}')
+    print(times_ms)
     for time_ms, errors_at_time in zip(times_ms, mpjpe_specific_times):
         if errors_at_time:
             avg_error = sum(errors_at_time) / len(errors_at_time)
             print(f'---> MPJPE at {time_ms} s = {avg_error*1000:.4f}')
+    
+    raise SystemExit
+
     all_motions = np.concatenate(all_motions, axis=0)
     # print(f"all_motions shape 1: {all_motions.shape}") (30, 22, 3, 196)
     all_motions = all_motions[:total_num_samples]  # [bs, njoints, 6, seqlen]
