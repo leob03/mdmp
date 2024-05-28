@@ -80,6 +80,30 @@ def main():
     # Use the subset data loader
     print("Extracting sequences from the end of the dataset...")
     total_samples = len(data.dataset)
+    print(total_samples)
+    frame_rate = 20  # 20 frames per second
+    min_frames = 60  # 3 seconds
+
+    # Initialize counters
+    total_sequences = 0
+    long_sequences = 0
+
+    # Iterate over the dataset
+    for batch in data:
+        input_motions, model_kwargs = batch
+        batch_size, njoints, _, seqlen = input_motions.shape
+
+        total_sequences += batch_size
+
+        # Count sequences longer than 60 frames
+        for i, length in enumerate(model_kwargs['y']['lengths'].cpu().numpy()):
+            if length >= min_frames:
+                long_sequences += 1 
+
+    print(f"Total number of sequences: {total_sequences}")
+    print(f"Number of sequences longer than 3 seconds: {long_sequences}")
+    raise SystemExit
+
     start_index = total_samples - args.num_samples
     subset_indices = list(range(start_index, total_samples))
     subset_dataset = torch.utils.data.Subset(data.dataset, subset_indices)
@@ -103,12 +127,13 @@ def main():
     model.eval()  # disable random masking
 
     if is_using_data:
-        iterator = iter(subset_data_loader)
+        iterator = iter(data)
+        # iterator = iter(subset_data_loader)
         # word_embeddings, pos_one_hots, caption, sent_len, motion, m_length, join_tokens = next(iterator)
         input_motions, model_kwargs = next(iterator)
         input_motions = input_motions.to(dist_util.dev())
         # print(model_kwargs['y']['text'])
-        # raise SystemExit
+        raise SystemExit
     else:
         collate_args = [{'inp': torch.zeros(n_frames), 'tokens': None, 'lengths': n_frames}] * args.num_samples
         is_t2m = any([args.input_text, args.text_prompt])
@@ -138,9 +163,7 @@ def main():
     #     model_kwargs['y']['inpainting_mask'][i, :, :, 50:] = False  # do inpainting in those frames
 
     times_ms = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]  # in seconds
-    # frame_indices = [int(20 * (t / 1000.0)) - start_idx for t in times_ms]
     frame_indices = [int(20 * t) for t in times_ms]
-    # mean_errors = []
     mpjpe_specific_times = [[] for _ in times_ms]  # List to store MPJPE at specific times
 
     for rep_i in range(args.num_repetitions):
@@ -183,17 +206,12 @@ def main():
                 const_noise=False,
             )            
 
-        # print(f"sample shape: {sample.shape}") # [10, 263, 1, 196]
-        # print(f"log_variance shape: {log_variance.shape}") # [10, 263, 1, 196]
-        # Recover XYZ *positions* from HumanML3D vector representation
+
         if model.data_rep == 'hml_vec':
             n_joints = 22 if sample.shape[1] == 263 else 21
-            sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float()
-            # print(f"sample shape 1: {sample.shape}") # [10, 1, 196, 263]
-            sample = recover_from_ric(sample, n_joints)
-            # print(f"sample shape 2: {sample.shape}") # [10, 1, 196, 22, 3]
-            sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1)
-            # print(f"sample shape 3: {sample.shape}") # [10, 22, 3, 196]
+            sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float() # [10, 1, 196, 263]
+            sample = recover_from_ric(sample, n_joints) # [10, 1, 196, 22, 3]
+            sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1)  # [10, 22, 3, 196]
             if args.learning_var:
                 log_variance = data.dataset.t2m_dataset.inv_transform(log_variance.cpu().permute(0, 2, 3, 1)).float()
                 log_variance = recover_from_ric(log_variance, n_joints)
@@ -229,7 +247,6 @@ def main():
         errors_reshaped = per_joint_errors.mean(dim=0)  # Mean over batch #torch.Size([196*22])
         overtime_3d_err = errors_reshaped.reshape(-1, nb_joints).mean(dim=1)  # torch.Size([196])
         mean_3d_err = overtime_3d_err.mean() # torch.Size([])
-        # mean_errors.append(mean_3d_err.item())
 
         # Compute MPJPE at specific time frames
         for idx, frame_idx in enumerate(frame_indices):
@@ -250,126 +267,126 @@ def main():
 
         print(f"created {len(all_motions) * args.batch_size} samples")
 
-    # mpjpe = sum(mean_errors) / len(mean_errors) if mean_errors else float('inf')
-    # print(f'---> Overall MPJPE = {mpjpe*1000:.4f}')
     print(times_ms)
     for time_ms, errors_at_time in zip(times_ms, mpjpe_specific_times):
         if errors_at_time:
             avg_error = sum(errors_at_time) / len(errors_at_time)
             print(f'---> MPJPE at {time_ms} s = {avg_error*1000:.4f}')
     
-    all_motions = np.concatenate(all_motions, axis=0)
-    # print(f"all_motions shape 1: {all_motions.shape}") (30, 22, 3, 196)
-    all_motions = all_motions[:total_num_samples]  # [bs, njoints, 6, seqlen]
-    # print(f"all_motions shape 2: {all_motions.shape}") (30, 22, 3, 196)
-    all_text = all_text[:total_num_samples]
-    all_lengths = np.concatenate(all_lengths, axis=0)[:total_num_samples]
-    if args.learning_var:
-        all_variances = np.concatenate(all_variances, axis=0)
-        all_variances = all_variances[:total_num_samples]
+    # raise SystemExit
 
-    if os.path.exists(out_path):
-        shutil.rmtree(out_path)
-    os.makedirs(out_path)
+#     all_motions = np.concatenate(all_motions, axis=0)
+#     # print(f"all_motions shape 1: {all_motions.shape}") (30, 22, 3, 196)
+#     all_motions = all_motions[:total_num_samples]  # [bs, njoints, 6, seqlen]
+#     # print(f"all_motions shape 2: {all_motions.shape}") (30, 22, 3, 196)
+#     all_text = all_text[:total_num_samples]
+#     all_lengths = np.concatenate(all_lengths, axis=0)[:total_num_samples]
+#     if args.learning_var:
+#         all_variances = np.concatenate(all_variances, axis=0)
+#         all_variances = all_variances[:total_num_samples]
 
-    npy_path = os.path.join(out_path, 'results.npy')
-    print(f"saving results file to [{npy_path}]")
-    if args.learning_var:
-        np.save(npy_path,
-            {'motion': all_motions, 'variances': all_variances, 'text': all_text, 'lengths': all_lengths,
-             'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
-    else:
-        np.save(npy_path,
-            {'motion': all_motions, 'text': all_text, 'lengths': all_lengths,
-             'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
-    with open(npy_path.replace('.npy', '.txt'), 'w') as fw:
-        fw.write('\n'.join(all_text))
-    with open(npy_path.replace('.npy', '_len.txt'), 'w') as fw:
-        fw.write('\n'.join([str(l) for l in all_lengths]))
+#     if os.path.exists(out_path):
+#         shutil.rmtree(out_path)
+#     os.makedirs(out_path)
 
-    print(f"saving visualizations to [{out_path}]...")
-    skeleton = paramUtil.kit_kinematic_chain if args.dataset == 'kit' else paramUtil.t2m_kinematic_chain
+#     npy_path = os.path.join(out_path, 'results.npy')
+#     print(f"saving results file to [{npy_path}]")
+#     if args.learning_var:
+#         np.save(npy_path,
+#             {'motion': all_motions, 'variances': all_variances, 'text': all_text, 'lengths': all_lengths,
+#              'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
+#     else:
+#         np.save(npy_path,
+#             {'motion': all_motions, 'text': all_text, 'lengths': all_lengths,
+#              'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
+#     with open(npy_path.replace('.npy', '.txt'), 'w') as fw:
+#         fw.write('\n'.join(all_text))
+#     with open(npy_path.replace('.npy', '_len.txt'), 'w') as fw:
+#         fw.write('\n'.join([str(l) for l in all_lengths]))
 
-    sample_files = []
-    num_samples_in_out_file = 7
+#     print(f"saving visualizations to [{out_path}]...")
+#     skeleton = paramUtil.kit_kinematic_chain if args.dataset == 'kit' else paramUtil.t2m_kinematic_chain
 
-    sample_print_template, row_print_template, all_print_template, \
-    sample_file_template, row_file_template, all_file_template = construct_template_variables(args.unconstrained)
+#     sample_files = []
+#     num_samples_in_out_file = 7
 
-    for sample_i in range(args.num_samples):
-        rep_files = []
-        for rep_i in range(args.num_repetitions):
-            caption = all_text[rep_i*args.batch_size + sample_i]
-            length = all_lengths[rep_i*args.batch_size + sample_i]
-            motion = all_motions[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
-            input_motions_reshaped_np = input_motions_reshaped.cpu().detach().numpy()  # if needed
-            input_motion_reshaped = input_motions_reshaped_np[sample_i].transpose(2, 0, 1)[:length]
-            # print(f"motion shape: {motion.shape}") (196, 22, 3)
-            if args.learning_var:
-                variance = all_variances[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
-            save_file = sample_file_template.format(sample_i, rep_i)
-            print(sample_print_template.format(caption, sample_i, rep_i, save_file))
-            animation_save_path = os.path.join(out_path, save_file)
-            # plot_3d_motion(animation_save_path, skeleton, motion, variance=variance, dataset=args.dataset, title=caption, fps=fps) #modified plot_3d_motion to include variance
-            assert motion.shape[0] == input_motion_reshaped.shape[0], f"Frame mismatch: joints has {motion.shape[0]} frames, gt_data has {input_motions_reshaped.shape[0]} frames."
-            if args.learning_var:
-                plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, variance=variance, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
-            else:
-                plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
+#     sample_print_template, row_print_template, all_print_template, \
+#     sample_file_template, row_file_template, all_file_template = construct_template_variables(args.unconstrained)
+
+#     for sample_i in range(args.num_samples):
+#         rep_files = []
+#         for rep_i in range(args.num_repetitions):
+#             caption = all_text[rep_i*args.batch_size + sample_i]
+#             length = all_lengths[rep_i*args.batch_size + sample_i]
+#             motion = all_motions[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
+#             input_motions_reshaped_np = input_motions_reshaped.cpu().detach().numpy()  # if needed
+#             input_motion_reshaped = input_motions_reshaped_np[sample_i].transpose(2, 0, 1)[:length]
+#             # print(f"motion shape: {motion.shape}") (196, 22, 3)
+#             if args.learning_var:
+#                 variance = all_variances[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
+#             save_file = sample_file_template.format(sample_i, rep_i)
+#             print(sample_print_template.format(caption, sample_i, rep_i, save_file))
+#             animation_save_path = os.path.join(out_path, save_file)
+#             # plot_3d_motion(animation_save_path, skeleton, motion, variance=variance, dataset=args.dataset, title=caption, fps=fps) #modified plot_3d_motion to include variance
+#             assert motion.shape[0] == input_motion_reshaped.shape[0], f"Frame mismatch: joints has {motion.shape[0]} frames, gt_data has {input_motions_reshaped.shape[0]} frames."
+#             if args.learning_var:
+#                 plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, variance=variance, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
+#             else:
+#                 plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
 
             
-            rep_files.append(animation_save_path)
+#             rep_files.append(animation_save_path)
 
-        sample_files = save_multiple_samples(args, out_path,
-                                               row_print_template, all_print_template, row_file_template, all_file_template,
-                                               caption, num_samples_in_out_file, rep_files, sample_files, sample_i)
+#         sample_files = save_multiple_samples(args, out_path,
+#                                                row_print_template, all_print_template, row_file_template, all_file_template,
+#                                                caption, num_samples_in_out_file, rep_files, sample_files, sample_i)
 
-    abs_path = os.path.abspath(out_path)
-    print(f'[Done] Results are at [{abs_path}]')
-
-
-def save_multiple_samples(args, out_path, row_print_template, all_print_template, row_file_template, all_file_template,
-                          caption, num_samples_in_out_file, rep_files, sample_files, sample_i):
-    all_rep_save_file = row_file_template.format(sample_i)
-    all_rep_save_path = os.path.join(out_path, all_rep_save_file)
-    ffmpeg_rep_files = [f' -i {f} ' for f in rep_files]
-    hstack_args = f' -filter_complex hstack=inputs={args.num_repetitions}' if args.num_repetitions > 1 else ''
-    ffmpeg_rep_cmd = f'ffmpeg -y -loglevel warning ' + ''.join(ffmpeg_rep_files) + f'{hstack_args} {all_rep_save_path}'
-    os.system(ffmpeg_rep_cmd)
-    print(row_print_template.format(caption, sample_i, all_rep_save_file))
-    sample_files.append(all_rep_save_path)
-    if (sample_i + 1) % num_samples_in_out_file == 0 or sample_i + 1 == args.num_samples:
-        # all_sample_save_file =  f'samples_{(sample_i - len(sample_files) + 1):02d}_to_{sample_i:02d}.mp4'
-        all_sample_save_file = all_file_template.format(sample_i - len(sample_files) + 1, sample_i)
-        all_sample_save_path = os.path.join(out_path, all_sample_save_file)
-        print(all_print_template.format(sample_i - len(sample_files) + 1, sample_i, all_sample_save_file))
-        ffmpeg_rep_files = [f' -i {f} ' for f in sample_files]
-        vstack_args = f' -filter_complex vstack=inputs={len(sample_files)}' if len(sample_files) > 1 else ''
-        ffmpeg_rep_cmd = f'ffmpeg -y -loglevel warning ' + ''.join(
-            ffmpeg_rep_files) + f'{vstack_args} {all_sample_save_path}'
-        os.system(ffmpeg_rep_cmd)
-        sample_files = []
-    return sample_files
+#     abs_path = os.path.abspath(out_path)
+#     print(f'[Done] Results are at [{abs_path}]')
 
 
-def construct_template_variables(unconstrained):
-    row_file_template = 'sample{:02d}.mp4'
-    all_file_template = 'samples_{:02d}_to_{:02d}.mp4'
-    if unconstrained:
-        sample_file_template = 'row{:02d}_col{:02d}.mp4'
-        sample_print_template = '[{} row #{:02d} column #{:02d} | -> {}]'
-        row_file_template = row_file_template.replace('sample', 'row')
-        row_print_template = '[{} row #{:02d} | all columns | -> {}]'
-        all_file_template = all_file_template.replace('samples', 'rows')
-        all_print_template = '[rows {:02d} to {:02d} | -> {}]'
-    else:
-        sample_file_template = 'sample{:02d}_rep{:02d}.mp4'
-        sample_print_template = '["{}" ({:02d}) | Rep #{:02d} | -> {}]'
-        row_print_template = '[ "{}" ({:02d}) | all repetitions | -> {}]'
-        all_print_template = '[samples {:02d} to {:02d} | all repetitions | -> {}]'
+# def save_multiple_samples(args, out_path, row_print_template, all_print_template, row_file_template, all_file_template,
+#                           caption, num_samples_in_out_file, rep_files, sample_files, sample_i):
+#     all_rep_save_file = row_file_template.format(sample_i)
+#     all_rep_save_path = os.path.join(out_path, all_rep_save_file)
+#     ffmpeg_rep_files = [f' -i {f} ' for f in rep_files]
+#     hstack_args = f' -filter_complex hstack=inputs={args.num_repetitions}' if args.num_repetitions > 1 else ''
+#     ffmpeg_rep_cmd = f'ffmpeg -y -loglevel warning ' + ''.join(ffmpeg_rep_files) + f'{hstack_args} {all_rep_save_path}'
+#     os.system(ffmpeg_rep_cmd)
+#     print(row_print_template.format(caption, sample_i, all_rep_save_file))
+#     sample_files.append(all_rep_save_path)
+#     if (sample_i + 1) % num_samples_in_out_file == 0 or sample_i + 1 == args.num_samples:
+#         # all_sample_save_file =  f'samples_{(sample_i - len(sample_files) + 1):02d}_to_{sample_i:02d}.mp4'
+#         all_sample_save_file = all_file_template.format(sample_i - len(sample_files) + 1, sample_i)
+#         all_sample_save_path = os.path.join(out_path, all_sample_save_file)
+#         print(all_print_template.format(sample_i - len(sample_files) + 1, sample_i, all_sample_save_file))
+#         ffmpeg_rep_files = [f' -i {f} ' for f in sample_files]
+#         vstack_args = f' -filter_complex vstack=inputs={len(sample_files)}' if len(sample_files) > 1 else ''
+#         ffmpeg_rep_cmd = f'ffmpeg -y -loglevel warning ' + ''.join(
+#             ffmpeg_rep_files) + f'{vstack_args} {all_sample_save_path}'
+#         os.system(ffmpeg_rep_cmd)
+#         sample_files = []
+#     return sample_files
 
-    return sample_print_template, row_print_template, all_print_template, \
-           sample_file_template, row_file_template, all_file_template
+
+# def construct_template_variables(unconstrained):
+#     row_file_template = 'sample{:02d}.mp4'
+#     all_file_template = 'samples_{:02d}_to_{:02d}.mp4'
+#     if unconstrained:
+#         sample_file_template = 'row{:02d}_col{:02d}.mp4'
+#         sample_print_template = '[{} row #{:02d} column #{:02d} | -> {}]'
+#         row_file_template = row_file_template.replace('sample', 'row')
+#         row_print_template = '[{} row #{:02d} | all columns | -> {}]'
+#         all_file_template = all_file_template.replace('samples', 'rows')
+#         all_print_template = '[rows {:02d} to {:02d} | -> {}]'
+#     else:
+#         sample_file_template = 'sample{:02d}_rep{:02d}.mp4'
+#         sample_print_template = '["{}" ({:02d}) | Rep #{:02d} | -> {}]'
+#         row_print_template = '[ "{}" ({:02d}) | all repetitions | -> {}]'
+#         all_print_template = '[samples {:02d} to {:02d} | all repetitions | -> {}]'
+
+#     return sample_print_template, row_print_template, all_print_template, \
+#            sample_file_template, row_file_template, all_file_template
 
 
 def load_dataset(args, max_frames, n_frames):
