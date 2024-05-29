@@ -363,23 +363,23 @@ def process_file(positions, feet_thre):
 def recover_root_rot_pos(data):
     # for HumanML: data.shape = [bs, 1, 196, 263]
     rot_vel = data[..., 0] # [bs, 1, 196]
-    r_rot_ang = torch.zeros_like(rot_vel).to(data.device)
+    r_rot_ang = torch.zeros_like(rot_vel).to(data.device) # [bs, 1, 196]
     '''Get Y-axis rotation from rotation velocity'''
-    r_rot_ang[..., 1:] = rot_vel[..., :-1]
-    r_rot_ang = torch.cumsum(r_rot_ang, dim=-1)
+    r_rot_ang[..., 1:] = rot_vel[..., :-1] # [bs, 1, 196]
+    r_rot_ang = torch.cumsum(r_rot_ang, dim=-1) # [bs, 1, 196]
 
-    r_rot_quat = torch.zeros(data.shape[:-1] + (4,)).to(data.device)
-    r_rot_quat[..., 0] = torch.cos(r_rot_ang)
-    r_rot_quat[..., 2] = torch.sin(r_rot_ang)
+    r_rot_quat = torch.zeros(data.shape[:-1] + (4,)).to(data.device) # [bs, 1, 196, 4]
+    r_rot_quat[..., 0] = torch.cos(r_rot_ang) # [bs, 1, 196, 4]
+    r_rot_quat[..., 2] = torch.sin(r_rot_ang) # [bs, 1, 196, 4]
 
-    r_pos = torch.zeros(data.shape[:-1] + (3,)).to(data.device)
-    r_pos[..., 1:, [0, 2]] = data[..., :-1, 1:3]
-    '''Add Y-axis rotation to root position'''
-    r_pos = qrot(qinv(r_rot_quat), r_pos)
+    r_pos = torch.zeros(data.shape[:-1] + (3,)).to(data.device) # [bs, 1, 196, 3]
+    r_pos[..., 1:, [0, 2]] = data[..., :-1, 1:3] # [bs, 1, 196, 3]
+    '''Add Y-axis rotation to root position''' 
+    r_pos = qrot(qinv(r_rot_quat), r_pos) # [bs, 1, 196, 3]
 
-    r_pos = torch.cumsum(r_pos, dim=-2)
+    r_pos = torch.cumsum(r_pos, dim=-2) # [bs, 1, 196, 3]
 
-    r_pos[..., 1] = data[..., 3]
+    r_pos[..., 1] = data[..., 3] # [bs, 1, 196, 3]
     return r_rot_quat, r_pos
 
 
@@ -416,19 +416,19 @@ def recover_rot(data):
 
 def recover_from_ric(data, joints_num):
     # for HumanML: data.shape = [10, 1, 196, 263], joints_num = 22
-    r_rot_quat, r_pos = recover_root_rot_pos(data)
-    positions = data[..., 4:(joints_num - 1) * 3 + 4]
-    positions = positions.view(positions.shape[:-1] + (-1, 3))
+    r_rot_quat, r_pos = recover_root_rot_pos(data) # [bs, 1, 196, 4], [bs, 1, 196, 3]
+    positions = data[..., 4:(joints_num - 1) * 3 + 4] # [bs, 1, 196, 63]
+    positions = positions.view(positions.shape[:-1] + (-1, 3)) # [bs, 1, 196, 21, 3]
 
     '''Add Y-axis rotation to local joints'''
-    positions = qrot(qinv(r_rot_quat[..., None, :]).expand(positions.shape[:-1] + (4,)), positions)
+    positions = qrot(qinv(r_rot_quat[..., None, :]).expand(positions.shape[:-1] + (4,)), positions) # [bs, 1, 196, 21, 3]
 
     '''Add root XZ to joints'''
-    positions[..., 0] += r_pos[..., 0:1]
-    positions[..., 2] += r_pos[..., 2:3]
+    positions[..., 0] += r_pos[..., 0:1] # [bs, 1, 196, 21, 3]
+    positions[..., 2] += r_pos[..., 2:3] # [bs, 1, 196, 21, 3]
 
     '''Concate root and joints'''
-    positions = torch.cat([r_pos.unsqueeze(-2), positions], dim=-2)
+    positions = torch.cat([r_pos.unsqueeze(-2), positions], dim=-2) # [bs, 1, 196, 22, 3]
 
     return positions
 '''
