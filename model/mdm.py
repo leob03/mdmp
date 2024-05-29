@@ -191,36 +191,6 @@ class MDM(nn.Module):
             assert x.shape == motion_embed.shape == motion_embed_mask.shape
             x = (x * ~motion_embed_mask) + (motion_embed * motion_embed_mask)
 
-            # enc_motion = y['motion_embed']
-            # bs, njoints, nfeats, nframes = enc_motion.shape
-
-            #reshaping for Linear layer
-            # enc_motion = enc_motion.permute((3, 0, 1, 2)).reshape(nframes, bs, njoints*nfeats)
-
-            ##Full input Linear
-            # emb_motion = self.motion_input_linear(enc_motion)
-            # x += emb_motion
-
-            ##Partial input Linear
-            # if enc_motion.shape[0] >= 10 and x.shape[0] >= 10:
-            #     emb_motion_first_10 = self.motion_input_linear(enc_motion[:10, :, :])
-            #     x[:10, :, :] += emb_motion_first_10
-
-            #reshaping for GCN layer
-            # enc_motion = enc_motion.permute((0, 3, 1, 2)).reshape(bs, nframes, njoints)
-
-            ##Partial input GCN
-            # if enc_motion.shape[0] >= 50 and x.shape[0] >= 50:
-            #     emb_motion_first_50 = self.motion_input_gcn(enc_motion[:, :50, :]) # [bs, 50, d]
-            #     x[:, :50, :] += emb_motion_first_50 # [bs, seqlen, d]
-            
-        #reshaping after GCN layer
-        # x = x.permute((1, 0, 2)) #[seqlen, bs, d]
-                
-        # Linear Input Processing
-        # x = self.input_process(x) # [seqlen, bs, d]
-
-        # GCN Input Processing
         x = self.input_process(x) # [bs, seqlen, d]
 
 
