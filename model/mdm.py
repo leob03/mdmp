@@ -179,12 +179,7 @@ class MDM(nn.Module):
             emb_gru = emb_gru.reshape(bs, self.latent_dim, 1, nframes)  #[bs, d, 1, #frames]
             x = torch.cat((x_reshaped, emb_gru), axis=1)  #[bs, d+joints*feat, 1, #frames]
 
-        # Linear Input Processing
-        # x = self.input_process(x) # [seqlen, bs, d]
-
-        # GCN Input Processing
-        # x = self.input_process_wGCN(x) # [bs, seqlen, d]
-
+        #Incorporate motion input
         if 'motion_embed' in y.keys() and 'motion_embed_mask' in y.keys():
             # print('motion_embed' in y.keys(), "multi-modal input detected")
             motion_embed, motion_embed_mask = y['motion_embed'], y['motion_embed_mask']
