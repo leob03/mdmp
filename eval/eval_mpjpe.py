@@ -50,7 +50,7 @@ def main():
                               hml_mode='eval')  
 
     total_samples = len(data.dataset)
-    # print(total_samples)
+    # print(total_samples) #4646
 
 
     # nb_samples_longer_than_three_seconds = 4328
@@ -84,7 +84,7 @@ def main():
 
     start_idx = args.emb_motion_len
 
-    times_ms = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]  # in seconds
+    times_ms = [0, 0.5, 1, 1.5, 2, 2.45, 2.5, 3, 3.5, 4, 4.5, 5]  # in seconds
     frame_indices = [int(20 * t) for t in times_ms]
     mpjpe_specific_times = [[] for _ in times_ms]  # List to store MPJPE at specific times
 
@@ -95,12 +95,13 @@ def main():
         # print(model_kwargs['y']['text'])
         # raise SystemExit
 
-
+        ### For Motion Editing
         # model_kwargs['y']['inpainted_motion'] = input_motions # [bs, njoints, 1, seqlen]
         # model_kwargs['y']['inpainting_mask'] = torch.ones_like(input_motions, dtype=torch.bool,
         #                                                         device=input_motions.device)  # True means use gt motion
         # for i, length in enumerate(model_kwargs['y']['lengths'].cpu().numpy()):
         #     model_kwargs['y']['inpainting_mask'][i, :, :, 50:] = False  # do inpainting in those frames
+        # ################################
 
         # add CFG scale to batch
         if args.guidance_param != 1:

@@ -359,8 +359,10 @@ def process_file(positions, feet_thre):
 # rot_data (B, seq_len, (joint_num - 1)*6)
 # local_velocity (B, seq_len, joint_num*3)
 # foot contact (B, seq_len, 4)
+
 def recover_root_rot_pos(data):
-    rot_vel = data[..., 0]
+    # for HumanML: data.shape = [bs, 1, 196, 263]
+    rot_vel = data[..., 0] # [bs, 1, 196]
     r_rot_ang = torch.zeros_like(rot_vel).to(data.device)
     '''Get Y-axis rotation from rotation velocity'''
     r_rot_ang[..., 1:] = rot_vel[..., :-1]
@@ -413,6 +415,7 @@ def recover_rot(data):
 
 
 def recover_from_ric(data, joints_num):
+    # for HumanML: data.shape = [10, 1, 196, 263], joints_num = 22
     r_rot_quat, r_pos = recover_root_rot_pos(data)
     positions = data[..., 4:(joints_num - 1) * 3 + 4]
     positions = positions.view(positions.shape[:-1] + (-1, 3))

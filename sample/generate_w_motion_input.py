@@ -188,6 +188,7 @@ def main():
         # Recover XYZ *positions* from HumanML3D vector representation
         if model.data_rep == 'hml_vec':
             n_joints = 22 if sample.shape[1] == 263 else 21
+            # sample.shape = [bs, 263, 1, 196]
             sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float()
             # print(f"sample shape 1: {sample.shape}") # [10, 1, 196, 263]
             sample = recover_from_ric(sample, n_joints)
