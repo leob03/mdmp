@@ -18,6 +18,7 @@ from data_loaders.humanml.utils.plot_script import plot_3d_motion
 from data_loaders.humanml.utils.plot_script import plot_3d_motion_with_gt
 import shutil
 from data_loaders.tensors import collate
+from tqdm import tqdm
 
 
 def main():
@@ -40,34 +41,6 @@ def main():
         elif args.input_text != '':
             out_path += '_' + os.path.basename(args.input_text).replace('.txt', '').replace(' ', '_').replace('.', '')
 
-    # this block must be called BEFORE the dataset is loaded
-    if args.text_prompt != '':
-        texts = [args.text_prompt]
-        args.num_samples = 1
-    elif args.input_text != '':
-        assert os.path.exists(args.input_text)
-        with open(args.input_text, 'r') as fr:
-            texts = fr.readlines()
-        texts = [s.replace('\n', '') for s in texts]
-        args.num_samples = len(texts)
-    elif args.action_name:
-        action_text = [args.action_name]
-        args.num_samples = 1
-    elif args.action_file != '':
-        assert os.path.exists(args.action_file)
-        with open(args.action_file, 'r') as fr:
-            action_text = fr.readlines()
-        action_text = [s.replace('\n', '') for s in action_text]
-        args.num_samples = len(action_text)
-
-    assert args.num_samples <= args.batch_size, \
-        f'Please either increase batch_size({args.batch_size}) or reduce num_samples({args.num_samples})'
-    # So why do we need this check? In order to protect GPU from a memory overload in the following line.
-    # If your GPU can handle batch size larger then default, you can specify it through --batch_size flag.
-    # If it doesn't, and you still want to sample more prompts, run this script with different seeds
-    # (specify through the --seed flag)
-    args.batch_size = args.num_samples  # Sampling a single batch from the testset, with exactly args.num_samples
-
     print('Loading dataset...')
     data = get_dataset_loader(name=args.dataset,
                               batch_size=args.batch_size,
@@ -75,36 +48,14 @@ def main():
                               split='test',
                             #   hml_mode='train') # in train mode, you get both text and motion.
                               hml_mode='eval')  
-    total_num_samples = args.num_samples * args.num_repetitions
 
-    # Use the subset data loader
-    print("Extracting sequences from the end of the dataset...")
     total_samples = len(data.dataset)
-    print(total_samples)
-    frame_rate = 20  # 20 frames per second
-    min_frames = 60  # 3 seconds
+    # print(total_samples)
 
-    # Initialize counters
-    total_sequences = 0
-    long_sequences = 0
 
-    # Iterate over the dataset
-    for batch in data:
-        input_motions, model_kwargs = batch
-        batch_size, njoints, _, seqlen = input_motions.shape
-
-        total_sequences += batch_size
-
-        # Count sequences longer than 60 frames
-        for i, length in enumerate(model_kwargs['y']['lengths'].cpu().numpy()):
-            if length >= min_frames:
-                long_sequences += 1 
-
-    print(f"Total number of sequences: {total_sequences}")
-    print(f"Number of sequences longer than 3 seconds: {long_sequences}")
-    raise SystemExit
-
-    start_index = total_samples - args.num_samples
+    # nb_samples_longer_than_three_seconds = 4328
+    nb_samples_longer_than_three_seconds = 4288
+    start_index = total_samples - nb_samples_longer_than_three_seconds
     subset_indices = list(range(start_index, total_samples))
     subset_dataset = torch.utils.data.Subset(data.dataset, subset_indices)
     subset_data_loader = torch.utils.data.DataLoader(subset_dataset, 
@@ -113,7 +64,7 @@ def main():
                                                     num_workers=8, 
                                                     collate_fn=get_collate_fn(args.dataset, 'eval'))
 
-
+    total_batches = len(subset_data_loader.dataset)
     print("Creating model and diffusion...")
     model, diffusion = create_model_and_diffusion(args, data)
 
@@ -126,28 +77,6 @@ def main():
     model.to(dist_util.dev())
     model.eval()  # disable random masking
 
-    if is_using_data:
-        iterator = iter(data)
-        # iterator = iter(subset_data_loader)
-        # word_embeddings, pos_one_hots, caption, sent_len, motion, m_length, join_tokens = next(iterator)
-        input_motions, model_kwargs = next(iterator)
-        input_motions = input_motions.to(dist_util.dev())
-        # print(model_kwargs['y']['text'])
-        raise SystemExit
-    else:
-        collate_args = [{'inp': torch.zeros(n_frames), 'tokens': None, 'lengths': n_frames}] * args.num_samples
-        is_t2m = any([args.input_text, args.text_prompt])
-        if is_t2m:
-            # t2m
-            collate_args = [dict(arg, text=txt) for arg, txt in zip(collate_args, texts)]
-        else:
-            # a2m
-            action = data.dataset.action_name_to_action(action_text)
-            collate_args = [dict(arg, action=one_action, action_text=one_action_text) for
-                            arg, one_action, one_action_text in zip(collate_args, action, action_text)]
-        input_motions, model_kwargs = collate(collate_args)
-        input_motions = input_motions.to(dist_util.dev())
-
     all_motions = []
     all_variances = []
     all_lengths = []
@@ -155,19 +84,23 @@ def main():
 
     start_idx = args.emb_motion_len
 
-    # model_kwargs['y']['inpainted_motion'] = input_motions
-    # # print(f'Input motion shape: {input_motions.shape}') # [bs, njoints, 1, seqlen]
-    # model_kwargs['y']['inpainting_mask'] = torch.ones_like(input_motions, dtype=torch.bool,
-    #                                                         device=input_motions.device)  # True means use gt motion
-    # for i, length in enumerate(model_kwargs['y']['lengths'].cpu().numpy()):
-    #     model_kwargs['y']['inpainting_mask'][i, :, :, 50:] = False  # do inpainting in those frames
-
     times_ms = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]  # in seconds
     frame_indices = [int(20 * t) for t in times_ms]
     mpjpe_specific_times = [[] for _ in times_ms]  # List to store MPJPE at specific times
 
-    for rep_i in range(args.num_repetitions):
-        print(f'### Sampling [repetitions #{rep_i}]')
+    for idx, batch in enumerate(tqdm(subset_data_loader, desc="Sampling batches")):
+        # print(f'### Sampling from batch {idx}/{total_batches}')
+        input_motions, model_kwargs = batch
+        input_motions = input_motions.to(dist_util.dev())
+        # print(model_kwargs['y']['text'])
+        # raise SystemExit
+
+
+        # model_kwargs['y']['inpainted_motion'] = input_motions # [bs, njoints, 1, seqlen]
+        # model_kwargs['y']['inpainting_mask'] = torch.ones_like(input_motions, dtype=torch.bool,
+        #                                                         device=input_motions.device)  # True means use gt motion
+        # for i, length in enumerate(model_kwargs['y']['lengths'].cpu().numpy()):
+        #     model_kwargs['y']['inpainting_mask'][i, :, :, 50:] = False  # do inpainting in those frames
 
         # add CFG scale to batch
         if args.guidance_param != 1:
@@ -177,97 +110,97 @@ def main():
         model_kwargs['y']['motion_embed_mask'][:, :, :, start_idx:] = False
         sample_fn = diffusion.p_sample_loop
 
-
-
-        if args.learning_var:
-            sample, log_variance = sample_fn(
-                model,
-                (args.batch_size, model.njoints, model.nfeats, max_frames),
-                clip_denoised=False,
-                model_kwargs=model_kwargs,
-                skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
-                init_image=None,
-                progress=True,
-                dump_steps=None,
-                noise=None,
-                const_noise=False,
-            )
-        else:
-            sample = sample_fn(
-                model,
-                (args.batch_size, model.njoints, model.nfeats, max_frames),
-                clip_denoised=False,
-                model_kwargs=model_kwargs,
-                skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
-                init_image=None,
-                progress=True,
-                dump_steps=None,
-                noise=None,
-                const_noise=False,
-            )            
-
-
-        if model.data_rep == 'hml_vec':
-            n_joints = 22 if sample.shape[1] == 263 else 21
-            sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float() # [10, 1, 196, 263]
-            sample = recover_from_ric(sample, n_joints) # [10, 1, 196, 22, 3]
-            sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1)  # [10, 22, 3, 196]
+        for rep_i in range(args.num_repetitions):
+            # print(f'### Sampling [repetitions #{rep_i}]')
             if args.learning_var:
-                log_variance = data.dataset.t2m_dataset.inv_transform(log_variance.cpu().permute(0, 2, 3, 1)).float()
-                log_variance = recover_from_ric(log_variance, n_joints)
-                log_variance = log_variance.view(-1, *log_variance.shape[2:]).permute(0, 2, 3, 1)
+                sample, log_variance = sample_fn(
+                    model,
+                    (args.batch_size, model.njoints, model.nfeats, max_frames),
+                    clip_denoised=False,
+                    model_kwargs=model_kwargs,
+                    skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
+                    init_image=None,
+                    progress=False,
+                    dump_steps=None,
+                    noise=None,
+                    const_noise=False,
+                )
+            else:
+                sample = sample_fn(
+                    model,
+                    (args.batch_size, model.njoints, model.nfeats, max_frames),
+                    clip_denoised=False,
+                    model_kwargs=model_kwargs,
+                    skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
+                    init_image=None,
+                    progress=False,
+                    dump_steps=None,
+                    noise=None,
+                    const_noise=False,
+                )            
 
-            #reshape input_motions to match the shape of sample
-            input_motions_reshaped = data.dataset.t2m_dataset.inv_transform(input_motions.cpu().permute(0, 2, 3, 1)).float()
-            input_motions_reshaped = recover_from_ric(input_motions_reshaped, n_joints)
-            input_motions_reshaped = input_motions_reshaped.view(-1, *input_motions_reshaped.shape[2:]).permute(0, 2, 3, 1)
 
-        # Applying rot2xyz transformation
-        rot2xyz_pose_rep = 'xyz' if model.data_rep in ['xyz', 'hml_vec'] else model.data_rep
-        rot2xyz_mask = None if rot2xyz_pose_rep == 'xyz' else model_kwargs['y']['mask'].reshape(args.batch_size, n_frames).bool()
-        sample = model.rot2xyz(x=sample, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
-                               jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
-                               get_rotations_back=False)
-        # print(f"sample shape 4: {sample.shape}") # [10, 22, 3, 196]
+            if model.data_rep == 'hml_vec':
+                n_joints = 22 if sample.shape[1] == 263 else 21
+                sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float() # [64, 1, 196, 263]
+                sample = recover_from_ric(sample, n_joints) # [64, 1, 196, 22, 3]
+                sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1)  # [64, 22, 3, 196]
+                if args.learning_var:
+                    log_variance = data.dataset.t2m_dataset.inv_transform(log_variance.cpu().permute(0, 2, 3, 1)).float()
+                    log_variance = recover_from_ric(log_variance, n_joints)
+                    log_variance = log_variance.view(-1, *log_variance.shape[2:]).permute(0, 2, 3, 1)
 
-        if args.learning_var:
-            log_variance = model.rot2xyz(x=log_variance, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
-                                        jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
-                                        get_rotations_back=False)
-        
-        input_motions_reshaped = model.rot2xyz(x=input_motions_reshaped, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
-                                  jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
-                                  get_rotations_back=False)
-        
-        # Compute MPJPE
-        B, nb_joints, _, nb_frames = input_motions_reshaped.shape
-        target_xyz_reshaped = input_motions_reshaped.permute(0, 3, 1, 2).reshape(args.num_samples, -1, 3)
-        pred_xyz_reshaped = sample.permute(0, 3, 1, 2).reshape(args.num_samples, -1, 3)
-        per_joint_errors = torch.norm(target_xyz_reshaped - pred_xyz_reshaped, 2, 2) # torch.Size([32, 196*22])
-        errors_reshaped = per_joint_errors.mean(dim=0)  # Mean over batch #torch.Size([196*22])
-        overtime_3d_err = errors_reshaped.reshape(-1, nb_joints).mean(dim=1)  # torch.Size([196])
-        mean_3d_err = overtime_3d_err.mean() # torch.Size([])
+                #reshape input_motions to match the shape of sample
+                input_motions_reshaped = data.dataset.t2m_dataset.inv_transform(input_motions.cpu().permute(0, 2, 3, 1)).float()
+                input_motions_reshaped = recover_from_ric(input_motions_reshaped, n_joints)
+                input_motions_reshaped = input_motions_reshaped.view(-1, *input_motions_reshaped.shape[2:]).permute(0, 2, 3, 1)
 
-        # Compute MPJPE at specific time frames
-        for idx, frame_idx in enumerate(frame_indices):
-            if frame_idx < nb_frames:
-                mpjpe_at_time = overtime_3d_err[frame_idx]
-                mpjpe_specific_times[idx].append(mpjpe_at_time.item())
+            # Applying rot2xyz transformation
+            rot2xyz_pose_rep = 'xyz' if model.data_rep in ['xyz', 'hml_vec'] else model.data_rep
+            rot2xyz_mask = None if rot2xyz_pose_rep == 'xyz' else model_kwargs['y']['mask'].reshape(args.batch_size, n_frames).bool()
+            sample = model.rot2xyz(x=sample, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
+                                jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
+                                get_rotations_back=False)
+            # print(f"sample shape 4: {sample.shape}") # [64, 22, 3, 196]
 
-        if args.unconstrained:
-            all_text += ['unconstrained'] * args.num_samples
-        else:
-            text_key = 'text' if 'text' in model_kwargs['y'] else 'action_text'
-            all_text += model_kwargs['y'][text_key]
+            if args.learning_var:
+                log_variance = model.rot2xyz(x=log_variance, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
+                                            jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
+                                            get_rotations_back=False)
+            
+            input_motions_reshaped = model.rot2xyz(x=input_motions_reshaped, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
+                                    jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
+                                    get_rotations_back=False)
+            
+            # Compute MPJPE
+            B, nb_joints, _, nb_frames = input_motions_reshaped.shape
+            target_xyz_reshaped = input_motions_reshaped.permute(0, 3, 1, 2).reshape(args.batch_size, -1, 3)
+            pred_xyz_reshaped = sample.permute(0, 3, 1, 2).reshape(args.batch_size, -1, 3)
+            per_joint_errors = torch.norm(target_xyz_reshaped - pred_xyz_reshaped, 2, 2) # torch.Size([32, 196*22])
+            errors_reshaped = per_joint_errors.mean(dim=0)  # Mean over batch #torch.Size([196*22])
+            overtime_3d_err = errors_reshaped.reshape(-1, nb_joints).mean(dim=1)  # torch.Size([196])
+            mean_3d_err = overtime_3d_err.mean() # torch.Size([])
 
-        all_motions.append(sample.cpu().numpy())
-        all_lengths.append(model_kwargs['y']['lengths'].cpu().numpy())
-        if args.learning_var:
-            all_variances.append(log_variance.cpu().numpy())
+            # Compute MPJPE at specific time frames
+            for idx, frame_idx in enumerate(frame_indices):
+                if frame_idx < nb_frames:
+                    mpjpe_at_time = overtime_3d_err[frame_idx]
+                    mpjpe_specific_times[idx].append(mpjpe_at_time.item())
 
-        print(f"created {len(all_motions) * args.batch_size} samples")
+            if args.unconstrained:
+                all_text += ['unconstrained'] * args.batch_size
+            else:
+                text_key = 'text' if 'text' in model_kwargs['y'] else 'action_text'
+                all_text += model_kwargs['y'][text_key]
 
-    print(times_ms)
+            all_motions.append(sample.cpu().numpy())
+            all_lengths.append(model_kwargs['y']['lengths'].cpu().numpy())
+            if args.learning_var:
+                all_variances.append(log_variance.cpu().numpy())
+
+        # print(f"created {len(all_motions) * args.batch_size} samples")
+
+    # print(times_ms)
     for time_ms, errors_at_time in zip(times_ms, mpjpe_specific_times):
         if errors_at_time:
             avg_error = sum(errors_at_time) / len(errors_at_time)
@@ -389,16 +322,16 @@ def main():
 #            sample_file_template, row_file_template, all_file_template
 
 
-def load_dataset(args, max_frames, n_frames):
-    # print(args.dataset)
-    data = get_dataset_loader(name=args.dataset,
-                              batch_size=args.batch_size,
-                              num_frames=max_frames,
-                              split='test',
-                              hml_mode='text_only')
-    if args.dataset in ['kit', 'humanml']:
-        data.dataset.t2m_dataset.fixed_length = n_frames
-    return data
+# def load_dataset(args, max_frames, n_frames):
+#     # print(args.dataset)
+#     data = get_dataset_loader(name=args.dataset,
+#                               batch_size=args.batch_size,
+#                               num_frames=max_frames,
+#                               split='test',
+#                               hml_mode='text_only')
+#     if args.dataset in ['kit', 'humanml']:
+#         data.dataset.t2m_dataset.fixed_length = n_frames
+#     return data
 
 
 if __name__ == "__main__":
