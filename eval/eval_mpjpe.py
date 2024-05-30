@@ -183,10 +183,12 @@ def main():
             mean_3d_err = overtime_3d_err.mean() # torch.Size([])
 
             # Compute MPJPE at specific time frames
-            for idx, frame_idx in enumerate(frame_indices):
+            for t_idx, frame_idx in enumerate(frame_indices):
                 if frame_idx < nb_frames:
                     mpjpe_at_time = overtime_3d_err[frame_idx]
-                    mpjpe_specific_times[idx].append(mpjpe_at_time.item())
+                    mpjpe_specific_times[t_idx].append(mpjpe_at_time.item())
+                    print(f'Batch {idx} - Repetition {rep_i} - Time {times_ms[t_idx]}s - MPJPE: {mpjpe_at_time:.4f}')
+
 
             if args.unconstrained:
                 all_text += ['unconstrained'] * args.batch_size

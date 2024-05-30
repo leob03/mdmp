@@ -49,15 +49,14 @@ class MDM(nn.Module):
         self.cond_mask_prob = kargs.get('cond_mask_prob', 0.)
         self.arch = arch
         self.use_gcn = use_gcn  # whether to use GCN for input and output processing
-        self.gru_emb_dim = self.latent_dim if self.arch == 'gru' else 0
 
         self.motion_input_linear = nn.Linear(self.input_feats, self.latent_dim)
 
         # self.motion_input_gcn = GraphConvolution(self.input_feats, self.latent_dim, node_n=50, bias=True)
         if not self.use_gcn:
-            self.input_process = InputProcess(self.data_rep, self.input_feats+self.gru_emb_dim, self.latent_dim)
+            self.input_process = InputProcess(self.data_rep, self.input_feats, self.latent_dim)
         else:
-            self.input_process = InputProcess_wGCN(self.data_rep, self.input_feats+self.gru_emb_dim, self.latent_dim)
+            self.input_process = InputProcess_wGCN(self.data_rep, self.input_feats, self.latent_dim)
 
         self.sequence_pos_encoder = PositionalEncoding(self.latent_dim, self.dropout)
         self.emb_trans_dec = emb_trans_dec

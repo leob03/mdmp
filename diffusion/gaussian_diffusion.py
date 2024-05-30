@@ -386,8 +386,8 @@ class GaussianDiffusion:
                 self._predict_xstart_from_xprev(x_t=x, t=t, xprev=model_output)
             )
             model_mean = model_output
-        elif self.model_mean_type in [ModelMeanType.START_X, ModelMeanType.EPSILON]:  # THIS IS US!
-            if self.model_mean_type == ModelMeanType.START_X:
+        elif self.model_mean_type in [ModelMeanType.START_X, ModelMeanType.EPSILON]: 
+            if self.model_mean_type == ModelMeanType.START_X:  # THIS IS US!
                 pred_xstart = process_xstart(model_output)
             else:
                 pred_xstart = process_xstart(
