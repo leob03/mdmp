@@ -140,7 +140,6 @@ def main():
                     const_noise=False,
                 )            
 
-
             if model.data_rep == 'hml_vec':
                 n_joints = 22 if sample.shape[1] == 263 else 21
                 sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float() # [64, 1, 196, 263]
@@ -172,19 +171,51 @@ def main():
             input_motions_reshaped = model.rot2xyz(x=input_motions_reshaped, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
                                     jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
                                     get_rotations_back=False)
+
+            valid_frame_mask = torch.zeros_like(input_motions_reshaped, dtype=torch.bool)
+
+            # Set valid frames to True based on sequence lengths
+            for i, length in enumerate(model_kwargs['y']['lengths'].cpu().numpy()):
+                valid_frame_mask[i, :, :, :length] = 1 # [64, 22, 3, 196]
+                sample[i, :, :, length:] = 0
+                input_motions[i, :, :, length:] = 0
             
+            # # Compute MPJPE
+            # B, nb_joints, _, nb_frames = input_motions_reshaped.shape
+            # target_xyz_reshaped = input_motions_reshaped.permute(0, 3, 1, 2).reshape(args.batch_size, -1, 3)
+            # pred_xyz_reshaped = sample.permute(0, 3, 1, 2).reshape(args.batch_size, -1, 3)
+            # per_joint_errors = torch.norm(target_xyz_reshaped - pred_xyz_reshaped, 2, 2) # torch.Size([32, 196*22])
+            # errors_reshaped = per_joint_errors.mean(dim=0)  # Mean over batch #torch.Size([196*22])
+            # overtime_3d_err = errors_reshaped.reshape(-1, nb_joints).mean(dim=1)  # torch.Size([196])
+            # mean_3d_err = overtime_3d_err.mean() # torch.Size([])
+
+            # # Compute MPJPE at specific time frames
+            # for t_idx, frame_idx in enumerate(frame_indices):
+            #     if frame_idx < nb_frames:
+            #         mpjpe_at_time = overtime_3d_err[frame_idx]
+            #         mpjpe_specific_times[t_idx].append(mpjpe_at_time.item())
+            #         print(f'Batch {idx} - Repetition {rep_i} - Time {times_ms[t_idx]}s - MPJPE: {mpjpe_at_time*1000:.4f}')
+
             # Compute MPJPE
             B, nb_joints, _, nb_frames = input_motions_reshaped.shape
             target_xyz_reshaped = input_motions_reshaped.permute(0, 3, 1, 2).reshape(args.batch_size, -1, 3)
-            pred_xyz_reshaped = sample.permute(0, 3, 1, 2).reshape(args.batch_size, -1, 3)
+            pred_xyz_reshaped = sample.permute(0, 3, 1, 2).reshape(args.batch_size, -1, 3) # torch.size([32, 196*22, 3]) 
             per_joint_errors = torch.norm(target_xyz_reshaped - pred_xyz_reshaped, 2, 2) # torch.Size([32, 196*22])
-            errors_reshaped = per_joint_errors.mean(dim=0)  # Mean over batch #torch.Size([196*22])
-            overtime_3d_err = errors_reshaped.reshape(-1, nb_joints).mean(dim=1)  # torch.Size([196])
+
+            # Apply the mask
+            valid_frame_mask_reshaped = valid_frame_mask.permute(0, 3, 1, 2).reshape(args.batch_size, -1, 3)
+            # valid_frame_mask_reshaped = valid_frame_mask_reshaped
+            per_joint_errors *= valid_frame_mask_reshaped
+
+            # Compute mean errors considering only valid frames
+            errors_reshaped = per_joint_errors.sum(dim=0) / valid_frame_mask_reshaped.sum(dim=0)  # Mean over batch #torch.Size([196*22])
+            overtime_3d_err = errors_reshaped.view(-1, nb_joints).mean(dim=1)  # torch.Size([196])
             mean_3d_err = overtime_3d_err.mean() # torch.Size([])
 
             # Compute MPJPE at specific time frames
             for t_idx, frame_idx in enumerate(frame_indices):
-                if frame_idx < nb_frames:
+                valid_mask_at_frame = valid_frame_mask[:, :, :, frame_idx].any(dim=1).any(dim=0)
+                if valid_mask_at_frame.item():
                     mpjpe_at_time = overtime_3d_err[frame_idx]
                     mpjpe_specific_times[t_idx].append(mpjpe_at_time.item())
                     print(f'Batch {idx} - Repetition {rep_i} - Time {times_ms[t_idx]}s - MPJPE: {mpjpe_at_time*1000:.4f}')
