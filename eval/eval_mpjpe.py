@@ -84,7 +84,7 @@ def main():
 
     start_idx = args.emb_motion_len
 
-    times_ms = [0, 0.5, 1, 1.5, 2, 2.45, 2.5, 3, 3.5, 4, 4.5, 5]  # in seconds
+    times_ms = [0, 0.5, 1, 1.5, 2, 2.45, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8]  # in seconds
     frame_indices = [int(20 * t) for t in times_ms]
     mpjpe_specific_times = [[] for _ in times_ms]  # List to store MPJPE at specific times
 
@@ -187,7 +187,7 @@ def main():
                 if frame_idx < nb_frames:
                     mpjpe_at_time = overtime_3d_err[frame_idx]
                     mpjpe_specific_times[t_idx].append(mpjpe_at_time.item())
-                    print(f'Batch {idx} - Repetition {rep_i} - Time {times_ms[t_idx]}s - MPJPE: {mpjpe_at_time:.4f}')
+                    print(f'Batch {idx} - Repetition {rep_i} - Time {times_ms[t_idx]}s - MPJPE: {mpjpe_at_time*1000:.4f}')
 
 
             if args.unconstrained:

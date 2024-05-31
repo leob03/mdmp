@@ -73,7 +73,7 @@ def plot_3d_motion(save_path, kinematic_tree, joints, title, dataset, variance =
     init()
     MINS = data.min(axis=0).min(axis=0)
     MAXS = data.max(axis=0).max(axis=0)
-    colors_blue = ["#4D84AA", "#5B9965", "#61CEB9", "#34C1E2", "#80B79A"]  # GT color
+    colors_blue = ["#4D84AA", "#5B9965", "#61CEB9", "#34C1E2", "#80B79A"]  # GT color 
     colors_orange = ["#DD5A37", "#D69E00", "#B75A39", "#FF6D00", "#DDB50E"]  # Generation color
     colors = colors_orange
     if vis_mode == 'upper_body':  # lower body taken fixed to input motion
@@ -108,8 +108,8 @@ def plot_3d_motion(save_path, kinematic_tree, joints, title, dataset, variance =
         ax.view_init(elev=120, azim=-90)
         ax.dist = 7.5
         #         ax =
-        plot_xzPlane(MINS[0] - trajec[index, 0], MAXS[0] - trajec[index, 0], 0, MINS[2] - trajec[index, 1],
-                     MAXS[2] - trajec[index, 1])
+        # plot_xzPlane(MINS[0] - trajec[index, 0], MAXS[0] - trajec[index, 0], 0, MINS[2] - trajec[index, 1],
+        #              MAXS[2] - trajec[index, 1])
         #         ax.scatter(dataset[index, :22, 0], dataset[index, :22, 1], dataset[index, :22, 2], color='black', s=3)
 
         # if index > 1:
