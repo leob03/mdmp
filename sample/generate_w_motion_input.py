@@ -196,7 +196,6 @@ def main():
                 # log_variance = recover_from_ric(log_variance, n_joints)
                 log_variance = log_variance.view(-1, *log_variance.shape[2:]).permute(0, 2, 3, 1) # [bs, 21, 3, 196]
 
-
             input_motions_reshaped = data.dataset.t2m_dataset.inv_transform(input_motions.cpu().permute(0, 2, 3, 1)).float()
             input_motions_reshaped = recover_from_ric(input_motions_reshaped, n_joints)
             input_motions_reshaped = input_motions_reshaped.view(-1, *input_motions_reshaped.shape[2:]).permute(0, 2, 3, 1)
@@ -206,8 +205,7 @@ def main():
         rot2xyz_mask = None if rot2xyz_pose_rep == 'xyz' else model_kwargs['y']['mask'].reshape(args.batch_size, n_frames).bool()
         sample = model.rot2xyz(x=sample, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
                                jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
-                               get_rotations_back=False)
-        # print(f"sample shape 4: {sample.shape}") # [10, 22, 3, 196]
+                               get_rotations_back=False) # [10, 22, 3, 196]
 
         # if args.learning_var:
         #     log_variance = model.rot2xyz(x=log_variance, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
