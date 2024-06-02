@@ -717,7 +717,7 @@ class TextOnlyDataset(data.Dataset):
         return None, None, caption, None, np.array([0]), self.fixed_length, None
         # fixed_length can be set from outside before sampling
 
-# A wrapper class for t2m original dataset for MDM purposes
+# A wrapper class for t2m original dataset for MDMP purposes when trained on HumanML3D
 class HumanML3D(data.Dataset):
     def __init__(self, mode, datapath='./dataset/humanml_opt.txt', split="train", **kwargs):
         self.mode = mode
@@ -775,7 +775,7 @@ class HumanML3D(data.Dataset):
     def __len__(self):
         return self.t2m_dataset.__len__()
 
-# A wrapper class for t2m original dataset for MDM purposes
+# A wrapper class for t2m original dataset
 class KIT(HumanML3D):
     def __init__(self, mode, datapath='./dataset/kit_opt.txt', split="train", **kwargs):
         super(KIT, self).__init__(mode, datapath, split, **kwargs)

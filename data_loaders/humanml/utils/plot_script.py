@@ -345,7 +345,8 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
     MAXS = np.maximum(data.max(axis=0).max(axis=0), gt_data.max(axis=0).max(axis=0))
     colors_blue = ["#4D84AA", "#5B9965", "#61CEB9", "#34C1E2", "#80B79A"]
     colors_orange = ["#DD5A37", "#D69E00", "#B75A39", "#FF6D00", "#DDB50E"]
-    specific_joints_indices = [3, 7, 8, 12, 20, 21]
+    # specific_joints_indices = [3, 7, 8, 12, 20, 21]
+    specific_joints_indices = [2, 6, 7, 11, 19, 20]
     colors = colors_orange
     if vis_mode == 'upper_body':
         colors[0] = colors_blue[0]

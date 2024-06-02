@@ -351,10 +351,13 @@ class GaussianDiffusion:
             if self.model_var_type == ModelVarType.LEARNED:
                 model_log_variance = model_var_values
                 model_variance = th.exp(model_log_variance)
-            else:
+            else: # THIS IS US!
+                # if torch.isnan(model_output).any():
+                #     model_output = torch.where(torch.isnan(model_output), torch.tensor(0, dtype=model_output.dtype, device=model_output.device), model_output)
                 min_log = _extract_into_tensor(self.posterior_log_variance_clipped, t, x.shape)
                 max_log = _extract_into_tensor(np.log(self.betas), t, x.shape)
                 frac = (model_var_values + 1) / 2
+                frac = th.clamp(frac, 0.001, 1)
                 model_log_variance = frac * max_log + (1 - frac) * min_log
                 model_variance = th.exp(model_log_variance)
         else:

@@ -103,8 +103,8 @@ def main():
     model.eval()  # disable random masking
 
     if is_using_data:
-        iterator = iter(subset_data_loader)
-        # word_embeddings, pos_one_hots, caption, sent_len, motion, m_length, join_tokens = next(iterator)
+        iterator = iter(subset_data_loader) # for fixed long sequences to compare different models
+        # iterator = iter(data) #for random sequences from the evaluation part of the dataset
         input_motions, model_kwargs = next(iterator)
         input_motions = input_motions.to(dist_util.dev())
         # print(model_kwargs['y']['text'])
@@ -137,10 +137,8 @@ def main():
     # for i, length in enumerate(model_kwargs['y']['lengths'].cpu().numpy()):
     #     model_kwargs['y']['inpainting_mask'][i, :, :, 50:] = False  # do inpainting in those frames
 
-    times_ms = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]  # in seconds
-    # frame_indices = [int(20 * (t / 1000.0)) - start_idx for t in times_ms]
+    times_ms = [0, 0.5, 1, 1.5, 2, 2.45, 2.95, 3.45, 3.95, 4.45, 4.95, 5.45, 5.95, 6.45, 6.95, 7.45, 7.95]
     frame_indices = [int(20 * t) for t in times_ms]
-    # mean_errors = []
     mpjpe_specific_times = [[] for _ in times_ms]  # List to store MPJPE at specific times
 
     for rep_i in range(args.num_repetitions):
@@ -187,20 +185,18 @@ def main():
         # print(f"log_variance shape: {log_variance.shape}") # [10, 263, 1, 196]
         # Recover XYZ *positions* from HumanML3D vector representation
         if model.data_rep == 'hml_vec':
-            n_joints = 22 if sample.shape[1] == 263 else 21
-            # sample.shape = [bs, 263, 1, 196]
-            sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float()
-            # print(f"sample shape 1: {sample.shape}") # [10, 1, 196, 263]
-            sample = recover_from_ric(sample, n_joints)
-            # print(f"sample shape 2: {sample.shape}") # [10, 1, 196, 22, 3]
-            sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1)
-            # print(f"sample shape 3: {sample.shape}") # [10, 22, 3, 196]
+            n_joints = 22 if sample.shape[1] == 263 else 21 # sample.shape = [bs, 263, 1, 196]
+            sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
+            sample = recover_from_ric(sample, n_joints) # [bs, 1, 196, 22, 3]
+            sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1) # [bs, 22, 3, 196]
             if args.learning_var:
-                log_variance = data.dataset.t2m_dataset.inv_transform(log_variance.cpu().permute(0, 2, 3, 1)).float()
-                log_variance = recover_from_ric(log_variance, n_joints)
-                log_variance = log_variance.view(-1, *log_variance.shape[2:]).permute(0, 2, 3, 1)
+                log_variance = data.dataset.t2m_dataset.inv_transform(log_variance.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
+                log_variance = log_variance[..., 4:(n_joints - 1) * 3 + 4] # [bs, 1, 196, 63]
+                log_variance = log_variance.view(log_variance.shape[:-1] + (-1, 3)) # [bs, 1, 196, 21, 3]
+                # log_variance = recover_from_ric(log_variance, n_joints)
+                log_variance = log_variance.view(-1, *log_variance.shape[2:]).permute(0, 2, 3, 1) # [bs, 21, 3, 196]
 
-            #reshape input_motions to match the shape of sample
+
             input_motions_reshaped = data.dataset.t2m_dataset.inv_transform(input_motions.cpu().permute(0, 2, 3, 1)).float()
             input_motions_reshaped = recover_from_ric(input_motions_reshaped, n_joints)
             input_motions_reshaped = input_motions_reshaped.view(-1, *input_motions_reshaped.shape[2:]).permute(0, 2, 3, 1)
@@ -213,30 +209,40 @@ def main():
                                get_rotations_back=False)
         # print(f"sample shape 4: {sample.shape}") # [10, 22, 3, 196]
 
-        if args.learning_var:
-            log_variance = model.rot2xyz(x=log_variance, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
-                                        jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
-                                        get_rotations_back=False)
+        # if args.learning_var:
+        #     log_variance = model.rot2xyz(x=log_variance, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
+        #                                 jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
+        #                                 get_rotations_back=False)
         
         input_motions_reshaped = model.rot2xyz(x=input_motions_reshaped, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
                                   jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
                                   get_rotations_back=False)
         
+        valid_frame_mask = torch.zeros_like(input_motions_reshaped, dtype=torch.bool)
+
+        for i, length in enumerate(model_kwargs['y']['lengths'].cpu().numpy()):
+            valid_frame_mask[i, :, :, :length] = 1 # [64, 22, 3, 196]
+            sample[i, :, :, length:] = 0
+            input_motions_reshaped[i, :, :, length:] = 0
+
         # Compute MPJPE
         B, nb_joints, _, nb_frames = input_motions_reshaped.shape
-        target_xyz_reshaped = input_motions_reshaped.permute(0, 3, 1, 2).reshape(args.num_samples, -1, 3)
-        pred_xyz_reshaped = sample.permute(0, 3, 1, 2).reshape(args.num_samples, -1, 3)
-        per_joint_errors = torch.norm(target_xyz_reshaped - pred_xyz_reshaped, 2, 2) # torch.Size([32, 196*22])
-        errors_reshaped = per_joint_errors.mean(dim=0)  # Mean over batch #torch.Size([196*22])
-        overtime_3d_err = errors_reshaped.reshape(-1, nb_joints).mean(dim=1)  # torch.Size([196])
-        mean_3d_err = overtime_3d_err.mean() # torch.Size([])
-        # mean_errors.append(mean_3d_err.item())
+        target_xyz_reshaped = input_motions_reshaped.permute(0, 3, 1, 2).reshape(args.batch_size, -1, 3) # torch.size([bs, 196*22, 3])
+        pred_xyz_reshaped = sample.permute(0, 3, 1, 2).reshape(args.batch_size, -1, 3) # torch.size([bs, 196*22, 3])
+        per_joint_errors = torch.norm(target_xyz_reshaped - pred_xyz_reshaped, 2, 2) # torch.Size([bs, 196*22])
+
+        valid_frame_mask_reshaped = valid_frame_mask.reshape(args.batch_size, -1, 3).any(dim=2) # torch.Size([bs, 196*22])
+
+        errors_reshaped = per_joint_errors.mean(dim=0) # Mean over batch #torch.Size([196*22])
+        overtime_3d_err = errors_reshaped.view(-1, nb_joints).mean(dim=1) # torch.Size([196])
 
         # Compute MPJPE at specific time frames
-        for idx, frame_idx in enumerate(frame_indices):
-            if frame_idx < nb_frames:
-                mpjpe_at_time = overtime_3d_err[frame_idx]
-                mpjpe_specific_times[idx].append(mpjpe_at_time.item())
+        for t_idx, frame_idx in enumerate(frame_indices):
+                valid_mask_at_frame = valid_frame_mask[:, :, :, frame_idx+10].any(dim=1).any(dim=0) # +10 is added because there is variability in the lengths of sequences within the same batch, so we prefer not to consider the last 10 frames to avoid this irregularity
+                if valid_mask_at_frame.any().item():  
+                    mpjpe_at_time = overtime_3d_err[frame_idx]
+                    mpjpe_specific_times[t_idx].append(mpjpe_at_time.item())
+                    # print(f'Repetition {rep_i} - Time {times_ms[t_idx]}s - MPJPE: {mpjpe_at_time*1000:.4f}')
 
         if args.unconstrained:
             all_text += ['unconstrained'] * args.num_samples
@@ -253,21 +259,19 @@ def main():
 
     # mpjpe = sum(mean_errors) / len(mean_errors) if mean_errors else float('inf')
     # print(f'---> Overall MPJPE = {mpjpe*1000:.4f}')
-    print(times_ms)
+    # print(times_ms)
     for time_ms, errors_at_time in zip(times_ms, mpjpe_specific_times):
         if errors_at_time:
             avg_error = sum(errors_at_time) / len(errors_at_time)
             print(f'---> MPJPE at {time_ms} s = {avg_error*1000:.4f}')
     
-    all_motions = np.concatenate(all_motions, axis=0)
-    # print(f"all_motions shape 1: {all_motions.shape}") (30, 22, 3, 196)
-    all_motions = all_motions[:total_num_samples]  # [bs, njoints, 6, seqlen]
-    # print(f"all_motions shape 2: {all_motions.shape}") (30, 22, 3, 196)
+    all_motions = np.concatenate(all_motions, axis=0) # [num_samples*num_repetitions, njoints, 3, seqlen]
+    all_motions = all_motions[:total_num_samples]  # [num_samples, njoints, 3, seqlen]
     all_text = all_text[:total_num_samples]
     all_lengths = np.concatenate(all_lengths, axis=0)[:total_num_samples]
     if args.learning_var:
         all_variances = np.concatenate(all_variances, axis=0)
-        all_variances = all_variances[:total_num_samples]
+        all_variances = all_variances[:total_num_samples] # [num_samples, njoints-1, 3, seqlen]
 
     if os.path.exists(out_path):
         shutil.rmtree(out_path)
@@ -307,7 +311,7 @@ def main():
             input_motion_reshaped = input_motions_reshaped_np[sample_i].transpose(2, 0, 1)[:length]
             # print(f"motion shape: {motion.shape}") (196, 22, 3)
             if args.learning_var:
-                variance = all_variances[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
+                variance = all_variances[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length] # [seqlen, njoints-1, 3]
             save_file = sample_file_template.format(sample_i, rep_i)
             print(sample_print_template.format(caption, sample_i, rep_i, save_file))
             animation_save_path = os.path.join(out_path, save_file)
