@@ -352,8 +352,6 @@ class GaussianDiffusion:
                 model_log_variance = model_var_values
                 model_variance = th.exp(model_log_variance)
             else: # THIS IS US!
-                # if torch.isnan(model_output).any():
-                #     model_output = torch.where(torch.isnan(model_output), torch.tensor(0, dtype=model_output.dtype, device=model_output.device), model_output)
                 min_log = _extract_into_tensor(self.posterior_log_variance_clipped, t, x.shape)
                 max_log = _extract_into_tensor(np.log(self.betas), t, x.shape)
                 frac = (model_var_values + 1) / 2
@@ -389,6 +387,7 @@ class GaussianDiffusion:
                 self._predict_xstart_from_xprev(x_t=x, t=t, xprev=model_output)
             )
             model_mean = model_output
+
         elif self.model_mean_type in [ModelMeanType.START_X, ModelMeanType.EPSILON]: 
             if self.model_mean_type == ModelMeanType.START_X:  # THIS IS US!
                 pred_xstart = process_xstart(model_output)
@@ -399,6 +398,7 @@ class GaussianDiffusion:
             model_mean, _, _ = self.q_posterior_mean_variance(
                 x_start=pred_xstart, x_t=x, t=t
             )
+            
         else:
             raise NotImplementedError(self.model_mean_type)
 

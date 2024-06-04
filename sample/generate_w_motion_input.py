@@ -152,8 +152,6 @@ def main():
         model_kwargs['y']['motion_embed_mask'][:, :, :, start_idx:] = False
         sample_fn = diffusion.p_sample_loop
 
-
-
         if args.learning_var:
             sample, log_variance = sample_fn(
                 model,
@@ -195,6 +193,7 @@ def main():
                 log_variance = log_variance.view(log_variance.shape[:-1] + (-1, 3)) # [bs, 1, 196, 21, 3]
                 # log_variance = recover_from_ric(log_variance, n_joints)
                 log_variance = log_variance.view(-1, *log_variance.shape[2:]).permute(0, 2, 3, 1) # [bs, 21, 3, 196]
+                # print(log_variance)
 
             input_motions_reshaped = data.dataset.t2m_dataset.inv_transform(input_motions.cpu().permute(0, 2, 3, 1)).float()
             input_motions_reshaped = recover_from_ric(input_motions_reshaped, n_joints)
