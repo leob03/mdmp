@@ -18,6 +18,8 @@ from diffusion.resample import create_named_schedule_sampler
 from data_loaders.humanml.networks.evaluator_wrapper import EvaluatorMDMWrapper
 from eval import eval_humanml, eval_humanact12_uestc
 from data_loaders.get_data import get_dataset_loader
+from data_loaders.humanml.scripts.motion_process import recover_from_ric
+
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -241,6 +243,11 @@ class TrainLoop:
             # Eliminates the microbatch feature
             assert i == 0
             assert self.microbatch == self.batch_size
+            bs, prev_feats, _, nframes = batch.shape
+            n_joints = 22  # x.shape = [bs, 263, 1, 196]
+            batch = batch.permute(0, 2, 3, 1) # [bs, 1, 196, 263]
+            batch = recover_from_ric(batch, n_joints) # [bs, 1, 196, 22, 3]
+            batch = batch.reshape(bs, 1, 196, 22*3).permute(0, 3, 1, 2) # [bs, 66, 1, 196]
             micro = batch
             # print("micro", micro.shape)
             micro_cond = cond

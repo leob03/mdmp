@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import clip
 from model.rotation2xyz import Rotation2xyz
 from model.gcn import GraphConvolution
+from data_loaders.humanml.scripts.motion_process import recover_from_ric
 
 
 
@@ -42,6 +43,7 @@ class MDM(nn.Module):
         self.action_emb = kargs.get('action_emb', None)
 
         self.input_feats = self.njoints * self.nfeats
+        self.input_feats_joints = 66  # 22 joints * 3 features
 
         self.normalize_output = kargs.get('normalize_encoder_output', False)
 
@@ -52,9 +54,9 @@ class MDM(nn.Module):
         self.use_gcn = use_gcn  # whether to use GCN for input and output processing
 
         if not self.use_gcn:
-            self.input_process = InputProcess(self.data_rep, self.input_feats, self.latent_dim)
+            self.input_process = InputProcess(self.data_rep, self.input_feats_joints, self.latent_dim)
         else:
-            self.input_process = InputProcess_wGCN(self.data_rep, self.input_feats, self.latent_dim)
+            self.input_process = InputProcess_wGCN(self.data_rep, self.input_feats_joints, self.latent_dim)
 
         self.sequence_pos_encoder = PositionalEncoding(self.latent_dim, self.dropout)
         self.emb_trans_dec = emb_trans_dec
@@ -98,10 +100,10 @@ class MDM(nn.Module):
                 print('EMBED ACTION')
 
         if not self.use_gcn:
-            self.output_process = OutputProcess(self.data_rep, self.input_feats, self.latent_dim, self.njoints,
+            self.output_process = OutputProcess(self.data_rep, self.input_feats_joints, self.latent_dim, self.njoints,
                                             self.nfeats, self.learning_var)
         else:
-            self.output_process = OutputProcess_wGCN(self.data_rep, self.input_feats, self.latent_dim, self.njoints,
+            self.output_process = OutputProcess_wGCN(self.data_rep, self.input_feats_joints, self.latent_dim, self.njoints,
                                             self.nfeats, self.learning_var)
 
         self.rot2xyz = Rotation2xyz(device='cpu', dataset=self.dataset)
@@ -343,9 +345,9 @@ class OutputProcess(nn.Module):
         else:
             raise ValueError
         if self.learning_var:
-            output = output.reshape(nframes, bs, 2 * self.njoints, self.nfeats)  # Updated
+            output = output.reshape(nframes, bs, 2 * self.input_feats, self.nfeats)  # Updated
         else:
-            output = output.reshape(nframes, bs, self.njoints, self.nfeats)
+            output = output.reshape(nframes, bs, self.input_feats, self.nfeats)
         output = output.permute(1, 2, 3, 0)  # [bs, 2 *njoints, nfeats, nframes]
         return output
 
@@ -383,9 +385,10 @@ class OutputProcess_wGCN(nn.Module):
             raise ValueError
         # Update: Reshape to include doubled features for mean and variance
         if self.learning_var:
-            output = output.reshape(nframes, bs, 2 * self.njoints, self.nfeats)  # Updated
+            # print('output shape', output.shape) # [seqlen, bs, 132]
+            output = output.reshape(nframes, bs, 2 * self.input_feats, self.nfeats)  # Updated
         else:
-            output = output.reshape(nframes, bs, self.njoints, self.nfeats)
+            output = output.reshape(nframes, bs, self.input_feats, self.nfeats)
         output = output.permute(1, 2, 3, 0)  # [bs, 2 *njoints, nfeats, nframes] Updated
         return output
 

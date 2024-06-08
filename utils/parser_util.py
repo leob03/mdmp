@@ -68,7 +68,7 @@ def add_diffusion_options(parser):
     group = parser.add_argument_group('diffusion')
     group.add_argument("--noise_schedule", default='cosine', choices=['linear', 'cosine'], type=str,
                        help="Noise schedule type")
-    group.add_argument("--diffusion_steps", default=1000, type=int,
+    group.add_argument("--diffusion_steps", default=50, type=int,
                        help="Number of diffusion steps (denoted T in the paper)")
     group.add_argument("--sigma_small", default=True, type=bool, help="Use smaller sigma values.")
 
@@ -78,8 +78,8 @@ def add_model_options(parser):
     group.add_argument("--arch", default='trans_enc',
                        choices=['trans_enc', 'trans_dec', 'gru'], type=str,
                        help="Architecture types as reported in the paper.")
-    group.add_argument("--use_gcn", default=False, type=bool)
-    group.add_argument("--emb_motion_len", default=0, type=int)
+    group.add_argument("--use_gcn", default=True, type=bool)
+    group.add_argument("--emb_motion_len", default=50, type=int)
     group.add_argument("--emb_trans_dec", default=False, type=bool,
                        help="For trans_dec architecture only, if true, will inject condition as a class token"
                             " (in addition to cross-attention).")
@@ -139,7 +139,7 @@ def add_training_options(parser):
                        help="Limit for the maximal number of frames. In HumanML3D and KIT this field is ignored.")
     group.add_argument("--resume_checkpoint", default="", type=str,
                        help="If not empty, will start from the specified checkpoint (path to model###.pt file).")
-    group.add_argument("--tensorboard_log_dir", default="./logs/multim_learnvar_motioninput50_1000t_model3", type=str,
+    group.add_argument("--tensorboard_log_dir", default="./logs/multim_learnvar_motioninput50_50t_joints_model3", type=str,
                        help="Directory where to store TensorBoard logs.")
 
 
