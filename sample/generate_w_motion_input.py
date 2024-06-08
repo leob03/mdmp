@@ -80,7 +80,7 @@ def main():
     # Use the subset data loader
     print("Extracting sequences from the end of the dataset...")
     total_samples = len(data.dataset)
-    start_index = total_samples - args.num_samples
+    start_index = total_samples - 2300
     subset_indices = list(range(start_index, total_samples))
     subset_dataset = torch.utils.data.Subset(data.dataset, subset_indices)
     subset_data_loader = torch.utils.data.DataLoader(subset_dataset, 

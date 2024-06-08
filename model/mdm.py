@@ -46,7 +46,8 @@ class MDM(nn.Module):
         self.normalize_output = kargs.get('normalize_encoder_output', False)
 
         self.cond_mode = kargs.get('cond_mode', 'no_cond')
-        self.cond_mask_prob = kargs.get('cond_mask_prob', 0.)
+        # self.cond_mode = kargs.get('no_cond')
+        self.cond_mask_prob = kargs.get('cond_mask_prob', 1.)
         self.arch = arch
         self.use_gcn = use_gcn  # whether to use GCN for input and output processing
 
@@ -125,7 +126,7 @@ class MDM(nn.Module):
         bs, d = cond.shape
         if force_mask:
             return torch.zeros_like(cond)
-        elif self.training and self.cond_mask_prob > 0.:
+        elif self.cond_mask_prob > 0.:
             mask = torch.bernoulli(torch.ones(bs, device=cond.device) * self.cond_mask_prob).view(bs, 1)  # 1-> use null_cond, 0-> use real cond
             return cond * (1. - mask)
         else:
@@ -156,7 +157,7 @@ class MDM(nn.Module):
         bs, njoints, nfeats, nframes = x.shape
         emb = self.embed_timestep(timesteps)  # [1, bs, d]
 
-        force_mask = y.get('uncond', False)
+        force_mask = y.get('uncond', True)
         if 'text' in self.cond_mode:
             # enc_text = self.encode_text(y['text'])        #with the next 4 lines, we allow the model to only call CLIP once per denoising process and reuse the embeddings
             if 'text_embed' in y.keys():  # caching option
@@ -187,6 +188,7 @@ class MDM(nn.Module):
 
         if self.arch == 'trans_enc':
             # adding the timestep embed
+            # emb_0 = torch.zeros_like(emb)
             xseq = torch.cat((emb, x), axis=0)  # [seqlen+1, bs, d]
             xseq = self.sequence_pos_encoder(xseq)  # [seqlen+1, bs, d]
             output = self.seqTransEncoder(xseq)[1:]  # , src_key_padding_mask=~maskseq)  # [seqlen, bs, d]

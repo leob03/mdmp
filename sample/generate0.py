@@ -84,7 +84,8 @@ def main():
 
     if is_using_data:
         iterator = iter(data)
-        _, model_kwargs = next(iterator)
+        input_motions, model_kwargs = next(iterator)
+        input_motions = input_motions.to(dist_util.dev())
     else:
         collate_args = [{'inp': torch.zeros(n_frames), 'tokens': None, 'lengths': n_frames}] * args.num_samples
         is_t2m = any([args.input_text, args.text_prompt])
@@ -108,6 +109,11 @@ def main():
         # add CFG scale to batch
         if args.guidance_param != 1:
             model_kwargs['y']['scale'] = torch.ones(args.batch_size, device=dist_util.dev()) * args.guidance_param
+
+        start_idx = 50
+        model_kwargs['y']['motion_embed'] = input_motions
+        model_kwargs['y']['motion_embed_mask'] = torch.ones_like(input_motions, dtype=torch.bool, device=input_motions.device)
+        model_kwargs['y']['motion_embed_mask'][:, :, :, start_idx:] = False
 
         sample_fn = diffusion.p_sample_loop
 
@@ -248,7 +254,7 @@ def load_dataset(args, max_frames, n_frames):
                               batch_size=args.batch_size,
                               num_frames=max_frames,
                               split='test',
-                              hml_mode='text_only')
+                              hml_mode='eval')
     if args.dataset in ['kit', 'humanml']:
         data.dataset.t2m_dataset.fixed_length = n_frames
     return data
