@@ -54,9 +54,9 @@ class MDM(nn.Module):
         self.use_gcn = use_gcn  # whether to use GCN for input and output processing
 
         if not self.use_gcn:
-            self.input_process = InputProcess(self.data_rep, self.input_feats_joints, self.latent_dim)
+            self.input_process = InputProcess(self.data_rep, self.input_feats, self.latent_dim)
         else:
-            self.input_process = InputProcess_wGCN(self.data_rep, self.input_feats_joints, self.latent_dim)
+            self.input_process = InputProcess_wGCN(self.data_rep, self.input_feats, self.latent_dim)
 
         self.sequence_pos_encoder = PositionalEncoding(self.latent_dim, self.dropout)
         self.emb_trans_dec = emb_trans_dec
@@ -100,10 +100,10 @@ class MDM(nn.Module):
                 print('EMBED ACTION')
 
         if not self.use_gcn:
-            self.output_process = OutputProcess(self.data_rep, self.input_feats_joints, self.latent_dim, self.njoints,
+            self.output_process = OutputProcess(self.data_rep, self.input_feats, self.latent_dim, self.njoints,
                                             self.nfeats, self.learning_var)
         else:
-            self.output_process = OutputProcess_wGCN(self.data_rep, self.input_feats_joints, self.latent_dim, self.njoints,
+            self.output_process = OutputProcess_wGCN(self.data_rep, self.input_feats, self.latent_dim, self.njoints,
                                             self.nfeats, self.learning_var)
 
         self.rot2xyz = Rotation2xyz(device='cpu', dataset=self.dataset)
