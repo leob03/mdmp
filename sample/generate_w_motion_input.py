@@ -130,6 +130,7 @@ def main():
 
     start_idx = args.emb_motion_len
 
+    # # For motion editing
     # model_kwargs['y']['inpainted_motion'] = input_motions
     # # print(f'Input motion shape: {input_motions.shape}') # [bs, njoints, 1, seqlen]
     # model_kwargs['y']['inpainting_mask'] = torch.ones_like(input_motions, dtype=torch.bool,
