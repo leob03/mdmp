@@ -1,4 +1,4 @@
-# This code is based on https://github.com/openai/guided-diffusion
+# This code is initially based on https://github.com/openai/guided-diffusion and AUSE was added.
 """
 Helpers for various likelihood-based losses. These are ported from the original
 Ho et al. diffusion models codebase:
@@ -7,6 +7,47 @@ https://github.com/hojonathanho/diffusion/blob/1e0dceb3b3495bbe19116a5e1b3596cd0
 
 import numpy as np
 import torch as th
+
+def calculate_ause(per_joint_errors, uncertainty_factor, valid_frame_mask, n_bins=10):
+    """
+    Compute the Area Under Sparsification Error (AUSE) to assess the quality of the uncertainty factors.
+
+    Shapes are automatically broadcasted, so batches can be compared to
+    scalars, among other use cases.
+    """
+    # Flatten the errors and variances
+    per_joint_errors = per_joint_errors.flatten()
+    uncertainty_factor = uncertainty_factor.flatten()
+    valid_frame_mask = valid_frame_mask.flatten()
+
+    # Filter valid frames
+    per_joint_errors = per_joint_errors[valid_frame_mask]
+    uncertainty_factor = uncertainty_factor[valid_frame_mask]
+
+    # Sort errors and variances by increasing variance
+    sorted_indices = uncertainty_factor.argsort()
+    sorted_errors = per_joint_errors[sorted_indices]
+    sorted_variances = uncertainty_factor[sorted_indices]
+
+    # Calculate the total error
+    total_error = sorted_errors.mean()
+
+    # Compute sparsification error at different levels
+    sparsification_errors = []
+    for i in range(1, n_bins + 1):
+        # Sparsification level: keep (1 - i/n_bins) fraction of the data
+        threshold_index = int((1 - i/n_bins) * len(sorted_errors))
+        sparsified_errors = sorted_errors[:threshold_index]
+        sparsified_error = sparsified_errors.mean()
+
+        # Calculate the sparsification error
+        sparsification_error = sparsified_error - total_error
+        sparsification_errors.append(sparsification_error)
+
+    # Calculate AUSE as the area under the sparsification error curve
+    ause = th.trapz(th.tensor(sparsification_errors), dx=1.0/n_bins)
+
+    return ause.item()
 
 
 def normal_kl(mean1, logvar1, mean2, logvar2):

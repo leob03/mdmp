@@ -678,6 +678,8 @@ class GaussianDiffusion:
         :return: a non-differentiable batch of samples.
         """
         final = None
+        means = []
+        log_variances = []
         if dump_steps is not None:
             dump = []
 
@@ -704,11 +706,23 @@ class GaussianDiffusion:
             if dump_steps is not None and i in dump_steps:
                 dump.append(deepcopy(sample["sample"]))
             final = sample
+            if i >= 40:  # Assuming 50 steps in total
+                means.append(sample["sample"].detach().cpu())
+                log_variances.append(sample["log_variance"].detach().cpu())
+
         if dump_steps is not None:
             return dump
         if self.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
+            # Stack collected tensors
+            means = torch.stack(means, dim=0)  # Shape: [10, bs, 263, 1, 196]
+            log_variances = torch.stack(log_variances, dim=0)  # Shape: [10, bs, 263, 1, 196]
+
+            # Compute the standard deviation across the first dimension (time steps)
+            mean_fluctuations = torch.std(means, dim=0)  # Resulting shape: [bs, 263, 1, 196]
+            log_variance_fluctuations = torch.std(log_variances, dim=0)
+            print('mean_fluctuations', mean_fluctuations.shape)
             #keep track of the mean AND variance
-            return final["sample"], final["log_variance"]
+            return final["sample"], final["log_variance"], mean_fluctuations, log_variance_fluctuations
         else:
             return final["sample"]
 

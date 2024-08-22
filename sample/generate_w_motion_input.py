@@ -18,6 +18,7 @@ from data_loaders.humanml.utils.plot_script import plot_3d_motion
 from data_loaders.humanml.utils.plot_script import plot_3d_motion_with_gt
 import shutil
 from data_loaders.tensors import collate
+from diffusion.losses import calculate_ause, discretized_gaussian_log_likelihood
 
 
 def main():
@@ -154,7 +155,7 @@ def main():
         sample_fn = diffusion.p_sample_loop
 
         if args.learning_var:
-            sample, log_variance = sample_fn(
+            sample, log_variance, mean_fluctuations, log_variance_fluctuations= sample_fn(
                 model,
                 (args.batch_size, model.njoints, model.nfeats, max_frames),
                 clip_denoised=False,
@@ -195,6 +196,15 @@ def main():
                 # log_variance = recover_from_ric(log_variance, n_joints)
                 log_variance = log_variance.view(-1, *log_variance.shape[2:]).permute(0, 2, 3, 1) # [bs, 21, 3, 196]
                 # print(log_variance)
+                mean_fluctuations = data.dataset.t2m_dataset.inv_transform(mean_fluctuations.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
+                mean_fluctuations = mean_fluctuations[..., 4:(n_joints - 1) * 3 + 4] # [bs, 1, 196, 63]
+                mean_fluctuations = mean_fluctuations.view(mean_fluctuations.shape[:-1] + (-1, 3)) # [bs, 1, 196, 21, 3]
+                mean_fluctuations = mean_fluctuations.view(-1, *mean_fluctuations.shape[2:]).permute(0, 2, 3, 1) # [bs, 21, 3, 196]
+
+                log_variance_fluctuations = data.dataset.t2m_dataset.inv_transform(log_variance_fluctuations.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
+                log_variance_fluctuations = log_variance_fluctuations[..., 4:(n_joints - 1) * 3 + 4] # [bs, 1, 196, 63]
+                log_variance_fluctuations = log_variance_fluctuations.view(log_variance_fluctuations.shape[:-1] + (-1, 3)) # [bs, 1, 196, 21, 3]
+                log_variance_fluctuations = log_variance_fluctuations.view(-1, *log_variance_fluctuations.shape[2:]).permute(0, 2, 3, 1) # [bs, 21, 3, 196]
 
             input_motions_reshaped = data.dataset.t2m_dataset.inv_transform(input_motions.cpu().permute(0, 2, 3, 1)).float()
             input_motions_reshaped = recover_from_ric(input_motions_reshaped, n_joints)
