@@ -19,6 +19,7 @@ from data_loaders.humanml.utils.plot_script import plot_3d_motion_with_gt
 import shutil
 from data_loaders.tensors import collate
 from diffusion.losses import calculate_ause, discretized_gaussian_log_likelihood
+from diffusion.nn import mean_flat, sum_flat
 
 
 def main():
@@ -181,6 +182,19 @@ def main():
                 const_noise=False,
             )            
 
+        print(input_motions.cpu().shape)
+        print(sample.cpu().shape)
+        
+        # Compute log-likelihood
+        if args.learning_var:
+            # log_likelihood = discretized_gaussian_log_likelihood(target_xyz_reshaped, pred_xyz_reshaped, log_variance)
+            # print(f'Repetition {rep_i} - Log-likelihood: {log_likelihood:.4f}')
+            decoder_nll = -discretized_gaussian_log_likelihood(input_motions, means=sample, log_scales=0.5 * log_variance)
+            assert decoder_nll.shape == input_motions.shape
+            decoder_nll = mean_flat(decoder_nll) / np.log(2.0)
+            decoder_nll_value = decoder_nll.item()  # Convert the tensor to a Python float
+            print(f'Repetition {rep_i} - Decoder NLL: {decoder_nll_value:.4f}')
+
         # print(f"sample shape: {sample.shape}") # [10, 263, 1, 196]
         # print(f"log_variance shape: {log_variance.shape}") # [10, 263, 1, 196]
         # Recover XYZ *positions* from HumanML3D vector representation
@@ -226,7 +240,7 @@ def main():
                                   jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
                                   get_rotations_back=False)
         
-        valid_frame_mask = torch.zeros_like(input_motions_reshaped, dtype=torch.bool)
+        valid_frame_mask = torch.zeros_like(input_motions_reshaped, dtype=torch.bool) # [bs, 22, 3, 196]
 
         for i, length in enumerate(model_kwargs['y']['lengths'].cpu().numpy()):
             valid_frame_mask[i, :, :, :length] = 1 # [64, 22, 3, 196]
@@ -251,6 +265,11 @@ def main():
                     mpjpe_at_time = overtime_3d_err[frame_idx]
                     mpjpe_specific_times[t_idx].append(mpjpe_at_time.item())
                     # print(f'Repetition {rep_i} - Time {times_ms[t_idx]}s - MPJPE: {mpjpe_at_time*1000:.4f}')
+
+        # Compute AUSE
+        if args.learning_var:
+            ause = calculate_ause(per_joint_errors, log_variance, valid_frame_mask_reshaped)
+            print(f'Repetition {rep_i} - AUSE: {ause:.4f}')
 
         if args.unconstrained:
             all_text += ['unconstrained'] * args.num_samples

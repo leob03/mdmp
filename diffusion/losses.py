@@ -8,31 +8,82 @@ https://github.com/hojonathanho/diffusion/blob/1e0dceb3b3495bbe19116a5e1b3596cd0
 import numpy as np
 import torch as th
 
+# def calculate_ause(per_joint_errors, uncertainty_factor, valid_frame_mask, n_bins=10):
+#     """
+#     Compute the Area Under Sparsification Error (AUSE) to assess the quality of the uncertainty factors.
+#     """
+#     # Flatten the errors and variances
+#     per_joint_errors = per_joint_errors.flatten()
+#     uncertainty_factor = uncertainty_factor.flatten()
+#     valid_frame_mask = valid_frame_mask.flatten()
+
+#     # Filter valid frames
+#     per_joint_errors = per_joint_errors[valid_frame_mask]
+#     uncertainty_factor = uncertainty_factor[valid_frame_mask]
+
+#     # Sort errors and variances by increasing variance
+#     sorted_indices = uncertainty_factor.argsort()
+#     sorted_errors = per_joint_errors[sorted_indices]
+#     sorted_variances = uncertainty_factor[sorted_indices]
+
+#     # Calculate the total error
+#     total_error = sorted_errors.mean()
+
+#     # Compute sparsification error at different levels
+#     sparsification_errors = []
+#     for i in range(1, n_bins + 1):
+#         # Sparsification level: keep (1 - i/n_bins) fraction of the data
+#         threshold_index = int((1 - i/n_bins) * len(sorted_errors))
+#         sparsified_errors = sorted_errors[:threshold_index]
+#         sparsified_error = sparsified_errors.mean()
+
+#         # Calculate the sparsification error
+#         sparsification_error = sparsified_error - total_error
+#         sparsification_errors.append(sparsification_error)
+
+#     # Calculate AUSE as the area under the sparsification error curve
+#     ause = th.trapz(th.tensor(sparsification_errors), dx=1.0/n_bins)
+
+#     return ause.item()
+
 def calculate_ause(per_joint_errors, uncertainty_factor, valid_frame_mask, n_bins=10):
     """
     Compute the Area Under Sparsification Error (AUSE) to assess the quality of the uncertainty factors.
 
-    Shapes are automatically broadcasted, so batches can be compared to
-    scalars, among other use cases.
+    :param per_joint_errors: Tensor of per-joint errors. Shape: [bs, 196*22]
+    :param uncertainty_factor: Tensor of uncertainty factors. Shape: [bs, 21, 3, 196]
+    :param valid_frame_mask: Tensor of valid frame masks. Shape: [bs, 196*22]
+    :param n_bins: Number of bins to use for the AUSE calculation.
     """
-    # Flatten the errors and variances
-    per_joint_errors = per_joint_errors.flatten()
-    uncertainty_factor = uncertainty_factor.flatten()
-    valid_frame_mask = valid_frame_mask.flatten()
+    B, nb_joints, _, nb_frames = uncertainty_factor.shape  # B=bs, nb_joints=21, nb_frames=196
+    
+    # Reduce uncertainty_factor over the 3D space dimension (x, y, z)
+    uncertainty_factor = uncertainty_factor.mean(dim=2)  # New shape: [bs, 21, 196]
+    uncertainty_factor = uncertainty_factor.permute(0, 2, 1).reshape(-1, 196 * 21)  # Shape: [bs, 196*21]
+
+    per_joint_errors = per_joint_errors.view(B, nb_frames, nb_joints+1)  # Shape: [bs, 196, 22]
+    # Exclude the root joint (joint 0)
+    per_joint_errors = per_joint_errors[:, :, 1:]  # Shape: [bs, 196, 21]
+    per_joint_errors = per_joint_errors.reshape(B, -1)  # Shape: [bs, 196*21]
+
+    # Flatten the errors and uncertainty_factor -> bin per batch+frame+joint
+    per_joint_errors = per_joint_errors.flatten()  # Shape: [bs * 196 * 21]
+    uncertainty_factor = uncertainty_factor.flatten()  # Shape: [bs * 196 * 21]
+    # valid_frame_mask = valid_frame_mask[:, :196 * 21].flatten()  # Shape: [bs * 196 * 21]
 
     # Filter valid frames
-    per_joint_errors = per_joint_errors[valid_frame_mask]
-    uncertainty_factor = uncertainty_factor[valid_frame_mask]
+    # per_joint_errors = per_joint_errors[valid_frame_mask]
+    # uncertainty_factor = uncertainty_factor[valid_frame_mask]
 
-    # Sort errors and variances by increasing variance
+    # Step 6: Sort errors and uncertainty_factor by increasing uncertainty_factor
     sorted_indices = uncertainty_factor.argsort()
     sorted_errors = per_joint_errors[sorted_indices]
-    sorted_variances = uncertainty_factor[sorted_indices]
+    sorted_uncertainty = uncertainty_factor[sorted_indices]
 
-    # Calculate the total error
+    # Step 7: Calculate the total error
     total_error = sorted_errors.mean()
 
-    # Compute sparsification error at different levels
+    # Step 8: Compute sparsification error at different levels
     sparsification_errors = []
     for i in range(1, n_bins + 1):
         # Sparsification level: keep (1 - i/n_bins) fraction of the data
@@ -44,7 +95,7 @@ def calculate_ause(per_joint_errors, uncertainty_factor, valid_frame_mask, n_bin
         sparsification_error = sparsified_error - total_error
         sparsification_errors.append(sparsification_error)
 
-    # Calculate AUSE as the area under the sparsification error curve
+    # Step 9: Calculate AUSE as the area under the sparsification error curve
     ause = th.trapz(th.tensor(sparsification_errors), dx=1.0/n_bins)
 
     return ause.item()

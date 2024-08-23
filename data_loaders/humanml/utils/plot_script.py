@@ -295,15 +295,6 @@ def plot_3d_motion(save_path, kinematic_tree, joints, title, dataset, variance =
 
 def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, variance=None, gt_data=None, figsize=(3, 3), fps=120, radius=3,
                            vis_mode='default', gt_frames=[], emb_motion_len=0):
-    import matplotlib
-    from matplotlib import pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
-    from matplotlib.animation import FuncAnimation
-    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-    import numpy as np
-    from textwrap import wrap
-
-    matplotlib.use('Agg')
 
     title = '\n'.join(wrap(title, 20))
 
@@ -396,11 +387,21 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
             [MAXS[0] - trajec_pred[index, 0], 0, MINS[2] - trajec_pred[index, 1]]
         ]])
 
+        # UNCOMMENT TO ADD JOINT LABELS
+        # for txt in ax.texts:
+        #     txt.set_visible(False)
+        # ax.texts.clear()
+
         for i, (chain, line_gt, line_pred) in enumerate(zip(kinematic_tree, lines_gt, lines_pred)):
             line_gt.set_data(gt_data[index, chain, 0], gt_data[index, chain, 1])
             line_gt.set_3d_properties(gt_data[index, chain, 2])
             line_pred.set_data(data[index, chain, 0], data[index, chain, 1])
             line_pred.set_3d_properties(data[index, chain, 2])
+
+            # UNCOMMENT TO ADD JOINT LABELS
+            # for joint_idx in chain:
+            #     x, y, z = gt_data[index, joint_idx]
+            #     ax.text(x, y, z, f'{joint_idx}', color='black', fontsize=8, ha='center', va='center')
 
         plt.axis('off')
         ax.set_xticklabels([])
