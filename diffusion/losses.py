@@ -75,6 +75,8 @@ def calculate_ause(per_joint_errors, uncertainty_factor, valid_frame_mask, n_bin
     # per_joint_errors = per_joint_errors[valid_frame_mask]
     # uncertainty_factor = uncertainty_factor[valid_frame_mask]
 
+    #Current point.
+
     # Step 6: Sort errors and uncertainty_factor by increasing uncertainty_factor
     sorted_indices = uncertainty_factor.argsort()
     sorted_errors = per_joint_errors[sorted_indices]
