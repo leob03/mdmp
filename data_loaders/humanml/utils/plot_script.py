@@ -417,12 +417,21 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
             for joint_idx in specific_joints_indices:
                 joint_position = data[index, joint_idx+1]
                 joint_variance = np.exp(0.5*np.mean(variance[index, joint_idx]))
-                joint_variance_exp = np.exp(joint_variance) * 0.47
+                # joint_variance_exp = np.exp(joint_variance) * 0.47
+                joint_variance_exp = np.exp(joint_variance) * 0.3
                 joint_variance_transformed = joint_variance_exp ** 8  # You can experiment with different powers or transformations
                 radius = joint_variance_transformed / 3
                 # radius = joint_variance / 3
                 sphere = draw_sphere(joint_position, radius, color='c', alpha=0.1)
                 spheres.append(sphere)
+
+        # if variance is not None:
+        #     for joint_idx in specific_joints_indices:
+        #         joint_position = data[index, joint_idx+1]
+        #         joint_variance = np.exp(0.5*np.mean(variance[index, joint_idx]))
+        #         radius = joint_variance / 3
+        #         sphere = draw_sphere(joint_position, radius, color='c', alpha=0.1)
+        #         spheres.append(sphere)
 
     ani = FuncAnimation(fig, update, frames=frame_number, interval=1000 / fps, repeat=False)
 

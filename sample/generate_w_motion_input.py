@@ -18,8 +18,9 @@ from data_loaders.humanml.utils.plot_script import plot_3d_motion
 from data_loaders.humanml.utils.plot_script import plot_3d_motion_with_gt
 import shutil
 from data_loaders.tensors import collate
-from diffusion.losses import calculate_ause, discretized_gaussian_log_likelihood
+from diffusion.losses import calculate_ause, discretized_gaussian_log_likelihood, calculate_ause2
 from diffusion.nn import mean_flat, sum_flat
+import matplotlib.pyplot as plt
 
 
 def main():
@@ -127,6 +128,7 @@ def main():
 
     all_motions = []
     all_variances = []
+    all_mean_fluctuations = []
     all_lengths = []
     all_text = []
 
@@ -182,17 +184,16 @@ def main():
                 const_noise=False,
             )            
 
-        print(input_motions.cpu().shape)
-        print(sample.cpu().shape)
+        # print(input_motions.cpu().shape) # [10, 263, 1, 196]
+        # print(sample.cpu().shape) # [10, 263, 1, 196]
         
         # Compute log-likelihood
         if args.learning_var:
-            # log_likelihood = discretized_gaussian_log_likelihood(target_xyz_reshaped, pred_xyz_reshaped, log_variance)
-            # print(f'Repetition {rep_i} - Log-likelihood: {log_likelihood:.4f}')
             decoder_nll = -discretized_gaussian_log_likelihood(input_motions, means=sample, log_scales=0.5 * log_variance)
             assert decoder_nll.shape == input_motions.shape
             decoder_nll = mean_flat(decoder_nll) / np.log(2.0)
-            decoder_nll_value = decoder_nll.item()  # Convert the tensor to a Python float
+            # print("decoder_nll shape:", decoder_nll.shape) # [10] -> one value per sample
+            decoder_nll_value = decoder_nll.mean()
             print(f'Repetition {rep_i} - Decoder NLL: {decoder_nll_value:.4f}')
 
         # print(f"sample shape: {sample.shape}") # [10, 263, 1, 196]
@@ -242,6 +243,8 @@ def main():
         
         valid_frame_mask = torch.zeros_like(input_motions_reshaped, dtype=torch.bool) # [bs, 22, 3, 196]
 
+        # print("lengths:",model_kwargs['y']['lengths'].cpu().numpy()) # [152 152 152 152 152 152 152 152 152 152] -> [length, ..., length] num_samples times
+
         for i, length in enumerate(model_kwargs['y']['lengths'].cpu().numpy()):
             valid_frame_mask[i, :, :, :length] = 1 # [64, 22, 3, 196]
             sample[i, :, :, length:] = 0
@@ -267,9 +270,23 @@ def main():
                     # print(f'Repetition {rep_i} - Time {times_ms[t_idx]}s - MPJPE: {mpjpe_at_time*1000:.4f}')
 
         # Compute AUSE
-        if args.learning_var:
-            ause = calculate_ause(per_joint_errors, log_variance, valid_frame_mask_reshaped)
-            print(f'Repetition {rep_i} - AUSE: {ause:.4f}')
+        # if args.learning_var:
+        #     sparsification_errors_lg, oracle, sparsification_levels_lg = calculate_ause(per_joint_errors, log_variance, model_kwargs['y']['lengths'], 'sparsification_error_plot.png')
+        #     sparsification_errors_mf, oracle, sparsification_levels_mf = calculate_ause(per_joint_errors, mean_fluctuations, model_kwargs['y']['lengths'], 'sparsification_error_plot.png')
+        #     plt.figure(figsize=(10, 6))
+        #     plt.plot(sparsification_levels_lg, sparsification_errors_lg, marker='o', linestyle='-', color='b', label='Log Variance')
+        #     plt.plot(sparsification_levels_mf, sparsification_errors_mf, marker='s', linestyle='--', color='r', label='Mean Fluctuations')
+        #     plt.plot(sparsification_levels_lg, oracle, marker='s', linestyle='--', color='r', label='Oracle')
+        #     plt.xlabel('Sparsification Level (Fraction of Data Removed)')
+        #     plt.ylabel('Sparsification Error')
+        #     plt.title('Sparsification Error vs. Sparsification Level')
+        #     plt.legend()
+        #     plt.grid(True)
+        #     plt.savefig('sparsification_error_plot.png')
+        #     plt.close()
+
+
+        # exit()
 
         if args.unconstrained:
             all_text += ['unconstrained'] * args.num_samples
@@ -281,7 +298,7 @@ def main():
         all_lengths.append(model_kwargs['y']['lengths'].cpu().numpy())
         if args.learning_var:
             all_variances.append(log_variance.cpu().numpy())
-
+            all_mean_fluctuations.append(mean_fluctuations.cpu().numpy())
         print(f"created {len(all_motions) * args.batch_size} samples")
 
     # mpjpe = sum(mean_errors) / len(mean_errors) if mean_errors else float('inf')
@@ -299,6 +316,8 @@ def main():
     if args.learning_var:
         all_variances = np.concatenate(all_variances, axis=0)
         all_variances = all_variances[:total_num_samples] # [num_samples, njoints-1, 3, seqlen]
+        all_mean_fluctuations = np.concatenate(all_mean_fluctuations, axis=0)
+        all_mean_fluctuations = all_mean_fluctuations[:total_num_samples] # [num_samples, njoints-1, 3, seqlen]
 
     if os.path.exists(out_path):
         shutil.rmtree(out_path)
@@ -339,13 +358,15 @@ def main():
             # print(f"motion shape: {motion.shape}") (196, 22, 3)
             if args.learning_var:
                 variance = all_variances[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length] # [seqlen, njoints-1, 3]
+                mean_fluctuation = all_mean_fluctuations[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length] # [seqlen, njoints-1, 3]
             save_file = sample_file_template.format(sample_i, rep_i)
             print(sample_print_template.format(caption, sample_i, rep_i, save_file))
             animation_save_path = os.path.join(out_path, save_file)
             # plot_3d_motion(animation_save_path, skeleton, motion, variance=variance, dataset=args.dataset, title=caption, fps=fps) #modified plot_3d_motion to include variance
             assert motion.shape[0] == input_motion_reshaped.shape[0], f"Frame mismatch: joints has {motion.shape[0]} frames, gt_data has {input_motions_reshaped.shape[0]} frames."
             if args.learning_var:
-                plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, variance=variance, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
+                # plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, variance=variance, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
+                plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, variance=mean_fluctuation, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
             else:
                 plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
 

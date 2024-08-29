@@ -12,6 +12,7 @@ import math
 import numpy as np
 import torch
 import torch as th
+import matplotlib.pyplot as plt
 from copy import deepcopy
 from diffusion.nn import mean_flat, sum_flat
 from diffusion.losses import normal_kl, discretized_gaussian_log_likelihood
@@ -717,10 +718,29 @@ class GaussianDiffusion:
             means = torch.stack(means, dim=0)  # Shape: [10, bs, 263, 1, 196]
             log_variances = torch.stack(log_variances, dim=0)  # Shape: [10, bs, 263, 1, 196]
 
+            # UNCOMMENT THIS TO PLOT MEAN EVOLUTION
+            # means = means.cpu().permute(0, 1, 3, 4, 2).float() # [10, bs, 1, 196, 263]
+            # means = means[..., 4:(22 - 1) * 3 + 4] # [10, bs, 1, 196, 63]
+            # means = means.view(means.shape[:-1] + (-1, 3)) # [10, bs, 1, 196, 21, 3]
+            # means = means.view(10, -1, *means.shape[3:]).permute(0, 1, 3, 4, 2) # [10, bs, 21, 3, 196]
+            # means = means.mean(dim=3) # [10, bs, 21, 196]
+            # means_frame_100 = means[:, :, :, 99]  # Shape: [10, bs, 21]
+            # plt.figure(figsize=(12, 8))
+            # for joint in range(21):
+            #     plt.plot(range(10), means_frame_100[:, 0, joint], label=f'Joint {joint}')
+            # plt.xlabel('Diffusion Steps (40 to 50)')
+            # plt.ylabel('Mean Value')
+            # plt.title('Evolution of Mean Values for 21 Joints at Frame 100')
+            # plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+            # plt.tight_layout()
+            # plot_path = 'mean_evolution_plot.png'
+            # plt.savefig(plot_path)
+            # plt.close()
+
             # Compute the standard deviation across the first dimension (time steps)
             mean_fluctuations = torch.std(means, dim=0)  # Resulting shape: [bs, 263, 1, 196]
             log_variance_fluctuations = torch.std(log_variances, dim=0)
-            print('mean_fluctuations', mean_fluctuations.shape)
+            # print('mean_fluctuations', mean_fluctuations.shape) #([10, 263, 1, 196])
             #keep track of the mean AND variance
             return final["sample"], final["log_variance"], mean_fluctuations, log_variance_fluctuations
         else:
