@@ -12,7 +12,7 @@ from utils.model_util import create_model_and_diffusion, load_model_wo_clip
 from utils import dist_util
 from model.cfg_sampler import ClassifierFreeSampleModel
 from data_loaders.get_data import get_dataset_loader, get_collate_fn
-from data_loaders.humanml.scripts.motion_process import recover_from_ric
+from data_loaders.humanml.scripts.motion_process import recover_from_ric, compute_uncertainty_factor
 import data_loaders.humanml.utils.paramUtil as paramUtil
 from data_loaders.humanml.utils.plot_script import plot_3d_motion
 from data_loaders.humanml.utils.plot_script import plot_3d_motion_with_gt
@@ -202,9 +202,15 @@ def main():
         if model.data_rep == 'hml_vec':
             n_joints = 22 if sample.shape[1] == 263 else 21 # sample.shape = [bs, 263, 1, 196]
             sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
+            data = sample
             sample = recover_from_ric(sample, n_joints) # [bs, 1, 196, 22, 3]
             sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1) # [bs, 22, 3, 196]
             if args.learning_var:
+                log_variance = log_variance.cpu().permute(0, 2, 3, 1).float()
+                uncertainty_factor = compute_uncertainty_factor(log_variance, n_joints)
+                print(f"uncertainty_factor shape: {uncertainty_factor.shape}")
+                exit()
+
                 log_variance = data.dataset.t2m_dataset.inv_transform(log_variance.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
                 log_variance = log_variance[..., 4:(n_joints - 1) * 3 + 4] # [bs, 1, 196, 63]
                 log_variance = log_variance.view(log_variance.shape[:-1] + (-1, 3)) # [bs, 1, 196, 21, 3]

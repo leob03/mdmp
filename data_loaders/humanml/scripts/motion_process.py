@@ -431,6 +431,40 @@ def recover_from_ric(data, joints_num):
     positions = torch.cat([r_pos.unsqueeze(-2), positions], dim=-2) # [bs, 1, 196, 22, 3]
 
     return positions
+
+def compute_uncertainty_factor(log_variance, n_joints=22):
+    """
+    Compute the uncertainty factor for each joint in each frame.
+    
+    Args:
+        log_variance (torch.Tensor): Uncertainty tensor of shape [bs, 1, 196, 263].
+        n_joints (int): Number of joints (default 22).
+        
+    Returns:
+        torch.Tensor: Uncertainty factor tensor of shape [bs, 22, 196].
+    """
+    # Root angular velocity (1 feature), linear velocity (2 features), height (1 feature)
+    root_rot_velocity = log_variance[..., 0]  # [bs, 1, 196]
+    root_linear_velocity = log_variance[..., 1:3]  # [bs, 1, 196, 2]
+    root_y = log_variance[..., 3]  # [bs, 1, 196]
+    root_local_velocity = log_variance[..., -n_joints*3-8:-n_joints*3-5]  # [bs, 1, 196, 3] for root
+
+    # Sum and normalize root joint features (7 features total)
+    root_uncertainty = (root_rot_velocity + torch.sum(root_linear_velocity, dim=-1) + root_y + torch.sum(root_local_velocity, dim=-1)) / 7  # [bs, 1, 196]
+
+    # 21 joints with 12 features each (3 positions, 6 rotations, 3 velocities)
+    joint_pos = log_variance[..., 4:4 + (n_joints - 1) * 3].view(-1, 1, 196, n_joints - 1, 3)  # [bs, 1, 196, 21, 3]
+    joint_rot = log_variance[..., 4 + (n_joints - 1) * 3:4 + (n_joints - 1) * 9].view(-1, 1, 196, n_joints - 1, 6)  # [bs, 1, 196, 21, 6]
+    joint_vel = log_variance[..., 7 + (n_joints - 1) * 9:7 + (n_joints - 1) * 12].view(-1, 1, 196, n_joints - 1, 3)  # [bs, 1, 196, 21, 3]
+
+    # Sum and normalize joint features (12 features per joint)
+    joint_uncertainty = (torch.sum(joint_pos, dim=-1) + torch.sum(joint_rot, dim=-1) + torch.sum(joint_vel, dim=-1)) / 12  # [bs, 1, 196, 21]
+
+    # Step 3: Concatenate root and joint uncertainties
+    uncertain_factor = torch.cat([root_uncertainty.unsqueeze(-1), joint_uncertainty], dim=-1)  # [bs, 22, 196]
+
+    return uncertain_factor
+
 '''
 For Text2Motion Dataset
 '''
