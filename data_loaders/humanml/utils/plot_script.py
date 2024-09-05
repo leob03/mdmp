@@ -336,8 +336,7 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
     MAXS = np.maximum(data.max(axis=0).max(axis=0), gt_data.max(axis=0).max(axis=0))
     colors_blue = ["#4D84AA", "#5B9965", "#61CEB9", "#34C1E2", "#80B79A"]
     colors_orange = ["#DD5A37", "#D69E00", "#B75A39", "#FF6D00", "#DDB50E"]
-    # specific_joints_indices = [3, 7, 8, 12, 20, 21]
-    specific_joints_indices = [2, 6, 7, 11, 19, 20]
+    specific_joints_indices = [0, 10, 11, 12, 20, 21]
     colors = colors_orange
     if vis_mode == 'upper_body':
         colors[0] = colors_blue[0]
@@ -368,6 +367,7 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
         return ax.plot_surface(x, y, z, color=color, alpha=alpha)
 
     def update(index):
+        # print(f"index: {index}")    
         ax.view_init(elev=120, azim=-90)
         ax.dist = 8.5
 
@@ -413,25 +413,28 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
             sphere = spheres.pop()
             sphere.remove()
 
-        if variance is not None:
-            for joint_idx in specific_joints_indices:
-                joint_position = data[index, joint_idx+1]
-                joint_variance = np.exp(0.5*np.mean(variance[index, joint_idx]))
-                # joint_variance_exp = np.exp(joint_variance) * 0.47
-                joint_variance_exp = np.exp(joint_variance) * 0.3
-                joint_variance_transformed = joint_variance_exp ** 8  # You can experiment with different powers or transformations
-                radius = joint_variance_transformed / 3
-                # radius = joint_variance / 3
-                sphere = draw_sphere(joint_position, radius, color='c', alpha=0.1)
-                spheres.append(sphere)
-
         # if variance is not None:
         #     for joint_idx in specific_joints_indices:
         #         joint_position = data[index, joint_idx+1]
-        #         joint_variance = np.exp(0.5*np.mean(variance[index, joint_idx]))
-        #         radius = joint_variance / 3
+        #         # joint_variance = np.exp(0.5*np.mean(variance[index, joint_idx]))
+        #         joint_variance = np.exp(0.5*variance[joint_idx, 0, index])
+        #         joint_variance_exp = np.exp(joint_variance) * 0.47
+        #         # joint_variance_exp = np.exp(joint_variance) * 0.3
+        #         joint_variance_transformed = joint_variance_exp ** 8  # You can experiment with different powers or transformations
+        #         radius = joint_variance_transformed / 3
+        #         # radius = joint_variance / 3
         #         sphere = draw_sphere(joint_position, radius, color='c', alpha=0.1)
         #         spheres.append(sphere)
+
+        if variance is not None:
+            for joint_idx in specific_joints_indices:
+                joint_position = data[index, joint_idx]
+                # joint_variance = np.exp(0.5*np.mean(variance[index, joint_idx]))
+                # joint_variance = np.exp(0.5*variance[joint_idx, 0, index])
+                joint_variance = 0.3*variance[joint_idx, 0, index]
+                radius = joint_variance / 3
+                sphere = draw_sphere(joint_position, radius, color='c', alpha=0.1)
+                spheres.append(sphere)
 
     ani = FuncAnimation(fig, update, frames=frame_number, interval=1000 / fps, repeat=False)
 

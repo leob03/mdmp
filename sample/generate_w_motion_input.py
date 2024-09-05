@@ -158,7 +158,7 @@ def main():
         sample_fn = diffusion.p_sample_loop
 
         if args.learning_var:
-            sample, log_variance, mean_fluctuations, log_variance_fluctuations= sample_fn(
+            sample, log_variance, mean_fluctuations= sample_fn(
                 model,
                 (args.batch_size, model.njoints, model.nfeats, max_frames),
                 clip_denoised=False,
@@ -202,30 +202,20 @@ def main():
         if model.data_rep == 'hml_vec':
             n_joints = 22 if sample.shape[1] == 263 else 21 # sample.shape = [bs, 263, 1, 196]
             sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
-            data = sample
             sample = recover_from_ric(sample, n_joints) # [bs, 1, 196, 22, 3]
             sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1) # [bs, 22, 3, 196]
             if args.learning_var:
-                log_variance = log_variance.cpu().permute(0, 2, 3, 1).float()
-                uncertainty_factor = compute_uncertainty_factor(log_variance, n_joints)
-                print(f"uncertainty_factor shape: {uncertainty_factor.shape}")
-                exit()
-
                 log_variance = data.dataset.t2m_dataset.inv_transform(log_variance.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
-                log_variance = log_variance[..., 4:(n_joints - 1) * 3 + 4] # [bs, 1, 196, 63]
-                log_variance = log_variance.view(log_variance.shape[:-1] + (-1, 3)) # [bs, 1, 196, 21, 3]
-                # log_variance = recover_from_ric(log_variance, n_joints)
-                log_variance = log_variance.view(-1, *log_variance.shape[2:]).permute(0, 2, 3, 1) # [bs, 21, 3, 196]
-                # print(log_variance)
-                mean_fluctuations = data.dataset.t2m_dataset.inv_transform(mean_fluctuations.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
-                mean_fluctuations = mean_fluctuations[..., 4:(n_joints - 1) * 3 + 4] # [bs, 1, 196, 63]
-                mean_fluctuations = mean_fluctuations.view(mean_fluctuations.shape[:-1] + (-1, 3)) # [bs, 1, 196, 21, 3]
-                mean_fluctuations = mean_fluctuations.view(-1, *mean_fluctuations.shape[2:]).permute(0, 2, 3, 1) # [bs, 21, 3, 196]
+                uncertainty_factor = compute_uncertainty_factor(log_variance, n_joints) # [bs, 22, 196]
+                # log_variance = log_variance[..., 4:(n_joints - 1) * 3 + 4] # [bs, 1, 196, 63]
+                # log_variance = log_variance.view(log_variance.shape[:-1] + (-1, 3)) # [bs, 1, 196, 21, 3]
+                # log_variance = log_variance.view(-1, *log_variance.shape[2:]).permute(0, 2, 3, 1) # [bs, 21, 3, 196]
 
-                log_variance_fluctuations = data.dataset.t2m_dataset.inv_transform(log_variance_fluctuations.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
-                log_variance_fluctuations = log_variance_fluctuations[..., 4:(n_joints - 1) * 3 + 4] # [bs, 1, 196, 63]
-                log_variance_fluctuations = log_variance_fluctuations.view(log_variance_fluctuations.shape[:-1] + (-1, 3)) # [bs, 1, 196, 21, 3]
-                log_variance_fluctuations = log_variance_fluctuations.view(-1, *log_variance_fluctuations.shape[2:]).permute(0, 2, 3, 1) # [bs, 21, 3, 196]
+                mean_fluctuations = mean_fluctuations.cpu().permute(0, 2, 3, 1).float() # [bs, 1, 196, 263]
+                uncertainty_factor_1 = compute_uncertainty_factor(mean_fluctuations, n_joints) # [bs, 22, 196]
+                # mean_fluctuations = mean_fluctuations[..., 4:(n_joints - 1) * 3 + 4] # [bs, 1, 196, 63]
+                # mean_fluctuations = mean_fluctuations.view(mean_fluctuations.shape[:-1] + (-1, 3)) # [bs, 1, 196, 21, 3]
+                # mean_fluctuations = mean_fluctuations.view(-1, *mean_fluctuations.shape[2:]).permute(0, 2, 3, 1) # [bs, 21, 3, 196]
 
             input_motions_reshaped = data.dataset.t2m_dataset.inv_transform(input_motions.cpu().permute(0, 2, 3, 1)).float()
             input_motions_reshaped = recover_from_ric(input_motions_reshaped, n_joints)
@@ -303,8 +293,9 @@ def main():
         all_motions.append(sample.cpu().numpy())
         all_lengths.append(model_kwargs['y']['lengths'].cpu().numpy())
         if args.learning_var:
-            all_variances.append(log_variance.cpu().numpy())
-            all_mean_fluctuations.append(mean_fluctuations.cpu().numpy())
+            # all_variances.append(log_variance.cpu().numpy())
+            all_variances.append(uncertainty_factor.cpu().numpy())
+            all_mean_fluctuations.append(uncertainty_factor_1.cpu().numpy())
         print(f"created {len(all_motions) * args.batch_size} samples")
 
     # mpjpe = sum(mean_errors) / len(mean_errors) if mean_errors else float('inf')

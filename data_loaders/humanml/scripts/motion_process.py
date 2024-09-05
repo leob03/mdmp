@@ -450,7 +450,7 @@ def compute_uncertainty_factor(log_variance, n_joints=22):
     root_local_velocity = log_variance[..., -n_joints*3-8:-n_joints*3-5]  # [bs, 1, 196, 3] for root
 
     # Sum and normalize root joint features (7 features total)
-    root_uncertainty = (root_rot_velocity + torch.sum(root_linear_velocity, dim=-1) + root_y + torch.sum(root_local_velocity, dim=-1)) / 7  # [bs, 1, 196]
+    root_uncertainty = root_rot_velocity + torch.sum(root_linear_velocity, dim=-1) + root_y + torch.sum(root_local_velocity, dim=-1)  # [bs, 1, 196]
 
     # 21 joints with 12 features each (3 positions, 6 rotations, 3 velocities)
     joint_pos = log_variance[..., 4:4 + (n_joints - 1) * 3].view(-1, 1, 196, n_joints - 1, 3)  # [bs, 1, 196, 21, 3]
@@ -458,10 +458,10 @@ def compute_uncertainty_factor(log_variance, n_joints=22):
     joint_vel = log_variance[..., 7 + (n_joints - 1) * 9:7 + (n_joints - 1) * 12].view(-1, 1, 196, n_joints - 1, 3)  # [bs, 1, 196, 21, 3]
 
     # Sum and normalize joint features (12 features per joint)
-    joint_uncertainty = (torch.sum(joint_pos, dim=-1) + torch.sum(joint_rot, dim=-1) + torch.sum(joint_vel, dim=-1)) / 12  # [bs, 1, 196, 21]
+    joint_uncertainty = torch.sum(joint_pos, dim=-1) + torch.sum(joint_rot, dim=-1) + torch.sum(joint_vel, dim=-1)  # [bs, 1, 196, 21]
 
     # Step 3: Concatenate root and joint uncertainties
-    uncertain_factor = torch.cat([root_uncertainty.unsqueeze(-1), joint_uncertainty], dim=-1)  # [bs, 22, 196]
+    uncertain_factor = torch.cat([root_uncertainty.unsqueeze(-1), joint_uncertainty], dim=-1)  # [bs, 1, 196, 22]
 
     return uncertain_factor
 
