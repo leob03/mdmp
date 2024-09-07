@@ -212,10 +212,7 @@ def main():
                 # log_variance = log_variance.view(-1, *log_variance.shape[2:]).permute(0, 2, 3, 1) # [bs, 21, 3, 196]
 
                 mean_fluctuations = mean_fluctuations.cpu().permute(0, 2, 3, 1).float() # [bs, 1, 196, 263]
-                uncertainty_factor_1 = compute_uncertainty_factor(mean_fluctuations, n_joints) # [bs, 22, 196]
-                # mean_fluctuations = mean_fluctuations[..., 4:(n_joints - 1) * 3 + 4] # [bs, 1, 196, 63]
-                # mean_fluctuations = mean_fluctuations.view(mean_fluctuations.shape[:-1] + (-1, 3)) # [bs, 1, 196, 21, 3]
-                # mean_fluctuations = mean_fluctuations.view(-1, *mean_fluctuations.shape[2:]).permute(0, 2, 3, 1) # [bs, 21, 3, 196]
+                uncertainty_factor_1 = compute_uncertainty_factor(mean_fluctuations, n_joints) # [bs, 1, 196, 22]
 
             input_motions_reshaped = data.dataset.t2m_dataset.inv_transform(input_motions.cpu().permute(0, 2, 3, 1)).float()
             input_motions_reshaped = recover_from_ric(input_motions_reshaped, n_joints)
@@ -267,20 +264,19 @@ def main():
 
         # Compute AUSE
         # if args.learning_var:
-        #     sparsification_errors_lg, oracle, sparsification_levels_lg = calculate_ause(per_joint_errors, log_variance, model_kwargs['y']['lengths'], 'sparsification_error_plot.png')
-        #     sparsification_errors_mf, oracle, sparsification_levels_mf = calculate_ause(per_joint_errors, mean_fluctuations, model_kwargs['y']['lengths'], 'sparsification_error_plot.png')
+        #     # sparsification_errors_lg, oracle, sparsification_levels_lg = calculate_ause(per_joint_errors, log_variance, model_kwargs['y']['lengths'], 'sparsification_error_plot.png')
+        #     sparsification_errors_mf, oracle, sparsification_levels_mf = calculate_ause(per_joint_errors, uncertainty_factor_1, model_kwargs['y']['lengths'], 'sparsification_error_plot.png')
         #     plt.figure(figsize=(10, 6))
-        #     plt.plot(sparsification_levels_lg, sparsification_errors_lg, marker='o', linestyle='-', color='b', label='Log Variance')
-        #     plt.plot(sparsification_levels_mf, sparsification_errors_mf, marker='s', linestyle='--', color='r', label='Mean Fluctuations')
-        #     plt.plot(sparsification_levels_lg, oracle, marker='s', linestyle='--', color='r', label='Oracle')
+        #     # plt.plot(sparsification_levels_lg, sparsification_errors_lg, marker='o', linestyle='-', color='b', label='Log Variance')
+        #     plt.plot(sparsification_levels_mf, sparsification_errors_mf, marker='s', linestyle='--', color='b', label='Mean Fluctuations')
+        #     plt.plot(sparsification_levels_mf, oracle, marker='s', linestyle='--', color='g', label='Oracle')
         #     plt.xlabel('Sparsification Level (Fraction of Data Removed)')
         #     plt.ylabel('Sparsification Error')
         #     plt.title('Sparsification Error vs. Sparsification Level')
         #     plt.legend()
         #     plt.grid(True)
-        #     plt.savefig('sparsification_error_plot.png')
+        #     plt.savefig('sparsification_error_plot1.png')
         #     plt.close()
-
 
         # exit()
 
@@ -307,15 +303,30 @@ def main():
             print(f'---> MPJPE at {time_ms} s = {avg_error*1000:.4f}')
     
     all_motions = np.concatenate(all_motions, axis=0) # [num_samples*num_repetitions, njoints, 3, seqlen]
-    all_motions = all_motions[:total_num_samples]  # [num_samples, njoints, 3, seqlen]
+    all_motions = all_motions[:total_num_samples]  # [num_samples*num_repetitions, njoints, 3, seqlen]
+    
+    # Compute uncertainty factor based on standard deviation between repetitions
+    all_motions_tensor = torch.from_numpy(all_motions)
+    uncertainty_particle = []
+    for sample_i in range(args.num_samples):
+        sample_motions = all_motions_tensor[sample_i::args.num_samples]  # Get all repetitions for this sample
+        std_dev = torch.std(sample_motions, dim=0, keepdim=True)  # Compute standard deviation across repetitions
+        std_dev = std_dev.repeat(args.num_repetitions, 1, 1, 1)  # [num_samples*num_repetitions, njoints, 3, seqlen]
+        uncertainty_particle.append(std_dev)
+    
+    uncertainty_particle = torch.stack(uncertainty_particle, dim=0)  # [num_samples, num_repetitions, njoints, 3, seqlen]
+    uncertainty_particle = uncertainty_particle.permute(1, 0, 2, 3, 4)  # [num_repetitions, num_samples, njoints, 3, seqlen]
+    uncertainty_particle = uncertainty_particle.reshape(-1, *uncertainty_particle.shape[2:])  # [num_samples*num_repetitions, njoints, 3, seqlen]
+    uncertainty_particle = uncertainty_particle.permute(0, 2, 3, 1)  # [num_samples*num_repetitions, 3, seqlen, njoints]
+    
     all_text = all_text[:total_num_samples]
     all_lengths = np.concatenate(all_lengths, axis=0)[:total_num_samples]
     if args.learning_var:
         all_variances = np.concatenate(all_variances, axis=0)
-        all_variances = all_variances[:total_num_samples] # [num_samples, njoints-1, 3, seqlen]
+        all_variances = all_variances[:total_num_samples] # [num_samples*num_repetitions, 1, seqlen, njoints]
         all_mean_fluctuations = np.concatenate(all_mean_fluctuations, axis=0)
-        all_mean_fluctuations = all_mean_fluctuations[:total_num_samples] # [num_samples, njoints-1, 3, seqlen]
-
+        all_mean_fluctuations = all_mean_fluctuations[:total_num_samples] # [num_samples*num_repetitions, 1, seqlen, njoints]
+        all_uncertainty_particle = uncertainty_particle.cpu().numpy()
     if os.path.exists(out_path):
         shutil.rmtree(out_path)
     os.makedirs(out_path)
@@ -324,7 +335,7 @@ def main():
     print(f"saving results file to [{npy_path}]")
     if args.learning_var:
         np.save(npy_path,
-            {'motion': all_motions, 'variances': all_variances, 'text': all_text, 'lengths': all_lengths,
+            {'motion': all_motions, 'variances': all_uncertainty_particle, 'text': all_text, 'lengths': all_lengths,
              'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
     else:
         np.save(npy_path,
@@ -354,8 +365,17 @@ def main():
             input_motion_reshaped = input_motions_reshaped_np[sample_i].transpose(2, 0, 1)[:length]
             # print(f"motion shape: {motion.shape}") (196, 22, 3)
             if args.learning_var:
-                variance = all_variances[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length] # [seqlen, njoints-1, 3]
+                variance = all_variances[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]  # [njoints, 1, seqlen]
+                # Apply smoothing to mean_fluctuation over time
+                window_size = 3  # Adjust this value to control the amount of smoothing
                 mean_fluctuation = all_mean_fluctuations[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length] # [seqlen, njoints-1, 3]
+                particle_uncertainty = all_uncertainty_particle[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length] # [seqlen, njoints, 3]
+                # mean_fluctuation_smoothed = np.zeros_like(mean_fluctuation)
+                # for i in range(mean_fluctuation.shape[0]):  # Iterate over joints
+                #     for j in range(mean_fluctuation.shape[1]):  # Iterate over dimensions
+                #         mean_fluctuation_smoothed[i, j, :] = np.convolve(mean_fluctuation[i, j, :], np.ones(window_size)/window_size, mode='same')
+                # mean_fluctuation = mean_fluctuation_smoothed
+
             save_file = sample_file_template.format(sample_i, rep_i)
             print(sample_print_template.format(caption, sample_i, rep_i, save_file))
             animation_save_path = os.path.join(out_path, save_file)
@@ -363,7 +383,7 @@ def main():
             assert motion.shape[0] == input_motion_reshaped.shape[0], f"Frame mismatch: joints has {motion.shape[0]} frames, gt_data has {input_motions_reshaped.shape[0]} frames."
             if args.learning_var:
                 # plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, variance=variance, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
-                plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, variance=mean_fluctuation, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
+                plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, variance=particle_uncertainty, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
             else:
                 plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
 

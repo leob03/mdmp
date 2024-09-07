@@ -13,19 +13,15 @@ def calculate_ause(per_joint_errors, uncertainty_factor, lengths, output_path, n
     Compute the Area Under Sparsification Error (AUSE) to assess the quality of the uncertainty factors.
 
     :param per_joint_errors: Tensor of per-joint errors. Shape: [bs, 196*22]
-    :param uncertainty_factor: Tensor of uncertainty factors. Shape: [bs, 21, 3, 196]
+    :param uncertainty_factor: Tensor of uncertainty factors. Shape: # [bs, 1, 196, 22]
     :param lengths: tensor of sequence actual length for each batch. Shape: [bs]
     :param n_bins: Number of bins to use for the AUSE calculation.
     """
-    B, nb_joints, _, nb_frames = uncertainty_factor.shape  # B=bs, nb_joints=21, nb_frames=196
-    
-    # Reduce uncertainty_factor over the 3D space dimension (x, y, z)
-    uncertainty_factor = uncertainty_factor.mean(dim=2)  # New shape: [bs, 21, 196]
-    uncertainty_factor = uncertainty_factor.permute(0, 2, 1)  # New shape: [bs, 196, 21]
+    B, _, nb_frames, nb_joints = uncertainty_factor.shape  # B=bs, nb_frames=196, nb_joints=22
 
-    per_joint_errors = per_joint_errors.view(B, nb_frames, nb_joints+1)  # Shape: [bs, 196, 22]
-    # Exclude the root joint (joint 0)
-    per_joint_errors = per_joint_errors[:, :, 1:]  # Shape: [bs, 196, 21]
+    uncertainty_factor = uncertainty_factor.squeeze(1)  # Shape: [bs, 196, 22]
+
+    per_joint_errors = per_joint_errors.view(B, nb_frames, nb_joints)  # Shape: [bs, 196, 22]
 
     # Find the shortest length in the batch
     shortest_length = lengths.min().item()
@@ -42,7 +38,7 @@ def calculate_ause(per_joint_errors, uncertainty_factor, lengths, output_path, n
     sorted_indices_by_uncertainty = uncertainty_factor.argsort()
     sorted_errors_by_uncertainty = per_joint_errors[sorted_indices_by_uncertainty]  # Sorted per-joint errors by uncertainty
     sorted_indices_by_error = per_joint_errors.argsort()
-    sorted_errors_by_error = uncertainty_factor[sorted_indices_by_error]  # Sorted per-joint errors by error  
+    sorted_errors_by_error = per_joint_errors[sorted_indices_by_error]  # Sorted per-joint errors by error  
 
     # Calculate the total error (mean of all per-joint errors)
     total_error = sorted_errors_by_uncertainty.mean().item()
@@ -59,15 +55,18 @@ def calculate_ause(per_joint_errors, uncertainty_factor, lengths, output_path, n
         
         sparsified_errors = sorted_errors_by_uncertainty[:threshold_index]  # Shape: [threshold_index]
         sparsified_error = sparsified_errors.mean().item()
+        # uncertainty_ration = (total_error - sparsified_error) / sparsified_error
 
         sparsified_errors_by_error = sorted_errors_by_error[:threshold_index]  # Shape: [threshold_index]
         sparsified_error_by_error = sparsified_errors_by_error.mean().item()
+        # error_ratio = (total_error - sparsified_error_by_error) / sparsified_error_by_error
 
-        # Calculate the sparsification error
-        sparsification_error = total_error - sparsified_error
-        # sparsification_errors.append(sparsification_error)
         sparsification_errors.append(sparsified_error)
         sparsification_errors_by_error.append(sparsified_error_by_error)
+
+        # sparsification_errors.append(uncertainty_ration)
+        # sparsification_errors_by_error.append(error_ratio)
+
         sparsification_levels.append(i/n_bins)
 
     return sparsification_errors, sparsification_errors_by_error, sparsification_levels

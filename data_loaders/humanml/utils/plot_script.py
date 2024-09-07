@@ -431,7 +431,7 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
                 joint_position = data[index, joint_idx]
                 # joint_variance = np.exp(0.5*np.mean(variance[index, joint_idx]))
                 # joint_variance = np.exp(0.5*variance[joint_idx, 0, index])
-                joint_variance = 0.3*variance[joint_idx, 0, index]
+                joint_variance = 10*np.mean(variance[joint_idx, :, index])
                 radius = joint_variance / 3
                 sphere = draw_sphere(joint_position, radius, color='c', alpha=0.1)
                 spheres.append(sphere)

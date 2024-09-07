@@ -290,6 +290,9 @@ class Text2MotionDatasetV2(data.Dataset):
     def inv_transform(self, data):
         return data * self.std + self.mean
 
+    def inv_transform_var(self, data):
+        return data * self.std
+
     def __len__(self):
         return len(self.data_dict) - self.pointer
 
