@@ -13,13 +13,11 @@ def calculate_ause(per_joint_errors, uncertainty_factor, lengths, output_path, n
     Compute the Area Under Sparsification Error (AUSE) to assess the quality of the uncertainty factors.
 
     :param per_joint_errors: Tensor of per-joint errors. Shape: [bs, 196*22]
-    :param uncertainty_factor: Tensor of uncertainty factors. Shape: # [bs, 1, 196, 22]
+    :param uncertainty_factor: Tensor of uncertainty factors. Shape: # [bs, 196, 22]
     :param lengths: tensor of sequence actual length for each batch. Shape: [bs]
     :param n_bins: Number of bins to use for the AUSE calculation.
     """
-    B, _, nb_frames, nb_joints = uncertainty_factor.shape  # B=bs, nb_frames=196, nb_joints=22
-
-    uncertainty_factor = uncertainty_factor.squeeze(1)  # Shape: [bs, 196, 22]
+    B, nb_frames, nb_joints = uncertainty_factor.shape  # B=bs, nb_frames=196, nb_joints=22
 
     per_joint_errors = per_joint_errors.view(B, nb_frames, nb_joints)  # Shape: [bs, 196, 22]
 

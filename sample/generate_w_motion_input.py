@@ -131,6 +131,7 @@ def main():
     all_mean_fluctuations = []
     all_lengths = []
     all_text = []
+    per_joint_errors_all = []
 
     start_idx = args.emb_motion_len
 
@@ -145,6 +146,7 @@ def main():
     times_ms = [0, 0.5, 1, 1.5, 2, 2.45, 2.95, 3.45, 3.95, 4.45, 4.95, 5.45, 5.95, 6.45, 6.95, 7.45, 7.95]
     frame_indices = [int(20 * t) for t in times_ms]
     mpjpe_specific_times = [[] for _ in times_ms]  # List to store MPJPE at specific times
+
 
     for rep_i in range(args.num_repetitions):
         print(f'### Sampling [repetitions #{rep_i}]')
@@ -186,6 +188,7 @@ def main():
 
         # print(input_motions.cpu().shape) # [10, 263, 1, 196]
         # print(sample.cpu().shape) # [10, 263, 1, 196]
+        # print(log_variance.cpu().shape) # [10, 263, 1, 196]
         
         # Compute log-likelihood
         if args.learning_var:
@@ -196,9 +199,6 @@ def main():
             decoder_nll_value = decoder_nll.mean()
             print(f'Repetition {rep_i} - Decoder NLL: {decoder_nll_value:.4f}')
 
-        # print(f"sample shape: {sample.shape}") # [10, 263, 1, 196]
-        # print(f"log_variance shape: {log_variance.shape}") # [10, 263, 1, 196]
-        # Recover XYZ *positions* from HumanML3D vector representation
         if model.data_rep == 'hml_vec':
             n_joints = 22 if sample.shape[1] == 263 else 21 # sample.shape = [bs, 263, 1, 196]
             sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
@@ -207,9 +207,6 @@ def main():
             if args.learning_var:
                 log_variance = data.dataset.t2m_dataset.inv_transform(log_variance.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
                 uncertainty_factor = compute_uncertainty_factor(log_variance, n_joints) # [bs, 22, 196]
-                # log_variance = log_variance[..., 4:(n_joints - 1) * 3 + 4] # [bs, 1, 196, 63]
-                # log_variance = log_variance.view(log_variance.shape[:-1] + (-1, 3)) # [bs, 1, 196, 21, 3]
-                # log_variance = log_variance.view(-1, *log_variance.shape[2:]).permute(0, 2, 3, 1) # [bs, 21, 3, 196]
 
                 mean_fluctuations = mean_fluctuations.cpu().permute(0, 2, 3, 1).float() # [bs, 1, 196, 263]
                 uncertainty_factor_1 = compute_uncertainty_factor(mean_fluctuations, n_joints) # [bs, 1, 196, 22]
@@ -224,11 +221,6 @@ def main():
         sample = model.rot2xyz(x=sample, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
                                jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
                                get_rotations_back=False) # [10, 22, 3, 196]
-
-        # if args.learning_var:
-        #     log_variance = model.rot2xyz(x=log_variance, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
-        #                                 jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
-        #                                 get_rotations_back=False)
         
         input_motions_reshaped = model.rot2xyz(x=input_motions_reshaped, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
                                   jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
@@ -236,23 +228,18 @@ def main():
         
         valid_frame_mask = torch.zeros_like(input_motions_reshaped, dtype=torch.bool) # [bs, 22, 3, 196]
 
-        # print("lengths:",model_kwargs['y']['lengths'].cpu().numpy()) # [152 152 152 152 152 152 152 152 152 152] -> [length, ..., length] num_samples times
-
         for i, length in enumerate(model_kwargs['y']['lengths'].cpu().numpy()):
             valid_frame_mask[i, :, :, :length] = 1 # [64, 22, 3, 196]
             sample[i, :, :, length:] = 0
             input_motions_reshaped[i, :, :, length:] = 0
 
         # Compute MPJPE
-        B, nb_joints, _, nb_frames = input_motions_reshaped.shape
         target_xyz_reshaped = input_motions_reshaped.permute(0, 3, 1, 2).reshape(args.batch_size, -1, 3) # torch.size([bs, 196*22, 3])
         pred_xyz_reshaped = sample.permute(0, 3, 1, 2).reshape(args.batch_size, -1, 3) # torch.size([bs, 196*22, 3])
         per_joint_errors = torch.norm(target_xyz_reshaped - pred_xyz_reshaped, 2, 2) # torch.Size([bs, 196*22])
-
-        valid_frame_mask_reshaped = valid_frame_mask.reshape(args.batch_size, -1, 3).any(dim=2) # torch.Size([bs, 196*22])
-
+        per_joint_errors_all.append(per_joint_errors)
         errors_reshaped = per_joint_errors.mean(dim=0) # Mean over batch #torch.Size([196*22])
-        overtime_3d_err = errors_reshaped.view(-1, nb_joints).mean(dim=1) # torch.Size([196])
+        overtime_3d_err = errors_reshaped.view(-1, n_joints).mean(dim=1) # torch.Size([196])
 
         # Compute MPJPE at specific time frames
         for t_idx, frame_idx in enumerate(frame_indices):
@@ -262,10 +249,12 @@ def main():
                     mpjpe_specific_times[t_idx].append(mpjpe_at_time.item())
                     # print(f'Repetition {rep_i} - Time {times_ms[t_idx]}s - MPJPE: {mpjpe_at_time*1000:.4f}')
 
-        # Compute AUSE
+        # # Compute AUSE
         # if args.learning_var:
-        #     # sparsification_errors_lg, oracle, sparsification_levels_lg = calculate_ause(per_joint_errors, log_variance, model_kwargs['y']['lengths'], 'sparsification_error_plot.png')
-        #     sparsification_errors_mf, oracle, sparsification_levels_mf = calculate_ause(per_joint_errors, uncertainty_factor_1, model_kwargs['y']['lengths'], 'sparsification_error_plot.png')
+        #     uncertainty_factor_ause = uncertainty_factor.squeeze(1)
+        #     uncertainty_factor1_ause = uncertainty_factor_1.squeeze(1)
+        #     # sparsification_errors_lg, oracle, sparsification_levels_lg = calculate_ause(per_joint_errors, uncertainty_factor_ause, model_kwargs['y']['lengths'], 'sparsification_error_plot.png')
+        #     sparsification_errors_mf, oracle, sparsification_levels_mf = calculate_ause(per_joint_errors, uncertainty_factor1_ause, model_kwargs['y']['lengths'], 'sparsification_error_plot.png')
         #     plt.figure(figsize=(10, 6))
         #     # plt.plot(sparsification_levels_lg, sparsification_errors_lg, marker='o', linestyle='-', color='b', label='Log Variance')
         #     plt.plot(sparsification_levels_mf, sparsification_errors_mf, marker='s', linestyle='--', color='b', label='Mean Fluctuations')
@@ -277,7 +266,6 @@ def main():
         #     plt.grid(True)
         #     plt.savefig('sparsification_error_plot1.png')
         #     plt.close()
-
         # exit()
 
         if args.unconstrained:
@@ -309,8 +297,8 @@ def main():
     all_motions_tensor = torch.from_numpy(all_motions)
     uncertainty_particle = []
     for sample_i in range(args.num_samples):
-        sample_motions = all_motions_tensor[sample_i::args.num_samples]  # Get all repetitions for this sample
-        std_dev = torch.std(sample_motions, dim=0, keepdim=True)  # Compute standard deviation across repetitions
+        sample_motions = all_motions_tensor[sample_i::args.num_samples]
+        std_dev = torch.std(sample_motions, dim=0, keepdim=True)
         std_dev = std_dev.repeat(args.num_repetitions, 1, 1, 1)  # [num_samples*num_repetitions, njoints, 3, seqlen]
         uncertainty_particle.append(std_dev)
     
@@ -318,6 +306,27 @@ def main():
     uncertainty_particle = uncertainty_particle.permute(1, 0, 2, 3, 4)  # [num_repetitions, num_samples, njoints, 3, seqlen]
     uncertainty_particle = uncertainty_particle.reshape(-1, *uncertainty_particle.shape[2:])  # [num_samples*num_repetitions, njoints, 3, seqlen]
     uncertainty_particle = uncertainty_particle.permute(0, 2, 3, 1)  # [num_samples*num_repetitions, 3, seqlen, njoints]
+
+    # Compute AUSE for uncertainty_particle
+    per_joint_errors_all = torch.cat(per_joint_errors_all, dim=0)  # [num_samples*num_repetitions, 196*22]
+    per_joint_errors_all = per_joint_errors_all.view(args.num_repetitions, args.num_samples, -1)  # [num_repetitions, num_samples, 196*22]
+    per_joint_errors_mean = per_joint_errors_all.mean(dim=0)  # [num_samples, 196*22]
+    if args.learning_var:
+        uncertainty_particle_ause = uncertainty_particle[0::args.num_repetitions] # [num_samples, 3, seqlen, njoints]
+        uncertainty_particle_ause = uncertainty_particle_ause.mean(dim=1) # [num_samples, seqlen, njoints]
+        sparsification_errors_up, oracle, sparsification_levels_up = calculate_ause(per_joint_errors_mean, uncertainty_particle_ause, model_kwargs['y']['lengths'], 'sparsification_error_plot.png')
+        plt.figure(figsize=(10, 6))
+        plt.plot(sparsification_levels_up, sparsification_errors_up, marker='s', linestyle='--', color='b', label='Mean Fluctuations')
+        plt.plot(sparsification_levels_up, oracle, marker='s', linestyle='--', color='g', label='Oracle')
+        plt.xlabel('Sparsification Level (Fraction of Data Removed)')
+        plt.ylabel('Sparsification Error')
+        plt.title('Sparsification Error vs. Sparsification Level')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig('sparsification_error_plot_uncertainty_particle.png')
+        plt.close()
+
+    exit()
     
     all_text = all_text[:total_num_samples]
     all_lengths = np.concatenate(all_lengths, axis=0)[:total_num_samples]
