@@ -19,7 +19,7 @@ from data_loaders.humanml.utils.plot_script import plot_3d_motion_with_gt
 import shutil
 from data_loaders.tensors import collate
 from tqdm import tqdm
-from diffusion.losses import calculate_ause, discretized_gaussian_log_likelihood, calculate_ause2
+from diffusion.losses import calculate_ause, discretized_gaussian_log_likelihood
 from diffusion.nn import mean_flat, sum_flat
 import matplotlib.pyplot as plt
 
@@ -59,7 +59,7 @@ def main():
 
     # nb_samples_longer_than_three_seconds = 4328
     nb_samples_longer_than_three_seconds = 4288
-    # nb_samples_longer_than_three_seconds = 320
+    nb_samples_longer_than_three_seconds = 320
     start_index = total_samples - nb_samples_longer_than_three_seconds
     subset_indices = list(range(start_index, total_samples))
     subset_dataset = torch.utils.data.Subset(data.dataset, subset_indices)
@@ -157,8 +157,8 @@ def main():
                     log_variance = data.dataset.t2m_dataset.inv_transform(log_variance.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
                     uncertainty_factor = compute_uncertainty_factor(log_variance, n_joints) # [bs, 22, 196]
 
-                mean_fluctuations = mean_fluctuations.cpu().permute(0, 2, 3, 1).float() # [bs, 1, 196, 263]
-                uncertainty_factor_1 = compute_uncertainty_factor(mean_fluctuations, n_joints) # [bs, 1, 196, 22]
+                    mean_fluctuations = mean_fluctuations.cpu().permute(0, 2, 3, 1).float() # [bs, 1, 196, 263]
+                    uncertainty_factor_1 = compute_uncertainty_factor(mean_fluctuations, n_joints) # [bs, 1, 196, 22]
 
                 input_motions_reshaped = data.dataset.t2m_dataset.inv_transform(input_motions.cpu().permute(0, 2, 3, 1)).float()
                 input_motions_reshaped = recover_from_ric(input_motions_reshaped, n_joints)
@@ -201,24 +201,11 @@ def main():
                     mpjpe_specific_times[t_idx].append(mpjpe_at_time.item())
                     print(f'Batch {idx} - Repetition {rep_i} - Time {times_ms[t_idx]}s - MPJPE: {mpjpe_at_time*1000:.4f}')
 
-            # # Compute AUSE
-            # if args.learning_var:
-            #     uncertainty_factor_ause = uncertainty_factor.squeeze(1)
-            #     uncertainty_factor1_ause = uncertainty_factor_1.squeeze(1)
-            #     # sparsification_errors_lg, oracle, sparsification_levels_lg = calculate_ause(per_joint_errors, uncertainty_factor_ause, model_kwargs['y']['lengths'], 'sparsification_error_plot.png')
-            #     sparsification_errors_mf, oracle, sparsification_levels_mf = calculate_ause(per_joint_errors, uncertainty_factor1_ause, model_kwargs['y']['lengths'], 'sparsification_error_plot.png')
-            #     plt.figure(figsize=(10, 6))
-            #     # plt.plot(sparsification_levels_lg, sparsification_errors_lg, marker='o', linestyle='-', color='b', label='Log Variance')
-            #     plt.plot(sparsification_levels_mf, sparsification_errors_mf, marker='s', linestyle='--', color='b', label='Mean Fluctuations')
-            #     plt.plot(sparsification_levels_mf, oracle, marker='s', linestyle='--', color='g', label='Oracle')
-            #     plt.xlabel('Sparsification Level (Fraction of Data Removed)')
-            #     plt.ylabel('Sparsification Error')
-            #     plt.title('Sparsification Error vs. Sparsification Level')
-            #     plt.legend()
-            #     plt.grid(True)
-            #     plt.savefig('sparsification_error_plot1.png')
-            #     plt.close()
-            # exit()
+            if args.learning_var:
+                uncertainty_factor_ause = uncertainty_factor.squeeze(1)
+                uncertainty_factor1_ause = uncertainty_factor_1.squeeze(1)
+                sparsification_errors_lg, oracle, sparsification_levels_lg = calculate_ause(per_joint_errors, uncertainty_factor_ause, model_kwargs['y']['lengths'])
+                sparsification_errors_mf, oracle, sparsification_levels_mf = calculate_ause(per_joint_errors, uncertainty_factor1_ause, model_kwargs['y']['lengths'])
 
             if args.unconstrained:
                 all_text += ['unconstrained'] * args.num_samples
@@ -262,14 +249,16 @@ def main():
 
     sparsification_errors_up, oracle, sparsification_levels_up = calculate_ause(per_joint_errors_mean, uncertainty_particle_ause_all, model_kwargs['y']['lengths'])
     plt.figure(figsize=(10, 6))
-    plt.plot(sparsification_levels_up, sparsification_errors_up, marker='s', linestyle='--', color='b', label='Mean Fluctuations')
+    plt.plot(sparsification_levels_lg, sparsification_errors_lg, marker='o', linestyle='-', color='b', label='Predicted Variance')
+    plt.plot(sparsification_levels_mf, sparsification_errors_mf, marker='s', linestyle=':', color='b', label='Denoising Fluctuations')
+    plt.plot(sparsification_levels_up, sparsification_errors_up, marker='s', linestyle='--', color='b', label='Mode Divergence')
     plt.plot(sparsification_levels_up, oracle, marker='s', linestyle='--', color='g', label='Oracle')
     plt.xlabel('Sparsification Level (Fraction of Data Removed)')
     plt.ylabel('Sparsification Error')
     plt.title('Sparsification Error vs. Sparsification Level')
     plt.legend()
     plt.grid(True)
-    plt.savefig('sparsification_error_plot_uncertainty_particle2.png')
+    plt.savefig('sparsification_error_plot_uncertainty_particle3.png')
     plt.close()
 
 if __name__ == "__main__":
