@@ -8,7 +8,7 @@ https://github.com/hojonathanho/diffusion/blob/1e0dceb3b3495bbe19116a5e1b3596cd0
 import numpy as np
 import torch as th
 
-def calculate_ause(per_joint_errors, uncertainty_factor, lengths, output_path, n_bins=10):
+def calculate_ause(per_joint_errors, uncertainty_factor, lengths, n_bins=10):
     """
     Compute the Area Under Sparsification Error (AUSE) to assess the quality of the uncertainty factors.
 

@@ -174,6 +174,11 @@ Download the model(s) you wish to use, then unzip and place them in `./save/`.
 python -m sample.generate --model_path ./save/humanml_trans_enc_512/model000200000.pt --num_samples 10 --num_repetitions 3
 ```
 
+```shell
+python -m sample.generate_w_motion_input --model_path ./save/multim_learnvar_motioninput50_50t_model3/model000600000.pt --num_samples 50 --num_repetitions 10
+```
+to add zones of presence with varying confidence levels: --learning_var True
+
 ### Generate from your text file
 
 ```shell
@@ -337,6 +342,11 @@ python -m train.train_mdm --save_dir save/my_name --dataset humanact12 --cond_ma
 * Add `--learning_var=True` to learn the variance during the diffusion denoising process
 
 ## Evaluate
+
+**MPJPE**
+```shell
+python -m eval.eval_humanml --model_path ./save/humanml_trans_enc_512/model000475000.pt
+```
 
 <details>
   <summary><b>Text to Motion</b></summary>

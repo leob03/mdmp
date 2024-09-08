@@ -17,7 +17,7 @@ from copy import deepcopy
 from diffusion.nn import mean_flat, sum_flat
 from diffusion.losses import normal_kl, discretized_gaussian_log_likelihood
 from data_loaders.humanml.scripts import motion_process
-from data_loaders.humanml.utils.uncertainty_factors import compute_relative_fluctuation, compute_fluctuation_duration, compute_mean_absolute_change, compute_max_change, compute_cumulative_variance
+from utils.uncertainty_factors import compute_relative_fluctuation, compute_fluctuation_duration, compute_mean_absolute_change, compute_max_change, compute_cumulative_variance
 
 def get_named_beta_schedule(schedule_name, num_diffusion_timesteps, scale_betas=1.):
     """

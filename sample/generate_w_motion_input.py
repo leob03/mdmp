@@ -160,7 +160,7 @@ def main():
         sample_fn = diffusion.p_sample_loop
 
         if args.learning_var:
-            sample, log_variance, mean_fluctuations= sample_fn(
+            sample, log_variance, mean_fluctuations = sample_fn(
                 model,
                 (args.batch_size, model.njoints, model.nfeats, max_frames),
                 clip_denoised=False,
@@ -189,15 +189,6 @@ def main():
         # print(input_motions.cpu().shape) # [10, 263, 1, 196]
         # print(sample.cpu().shape) # [10, 263, 1, 196]
         # print(log_variance.cpu().shape) # [10, 263, 1, 196]
-        
-        # Compute log-likelihood
-        if args.learning_var:
-            decoder_nll = -discretized_gaussian_log_likelihood(input_motions, means=sample, log_scales=0.5 * log_variance)
-            assert decoder_nll.shape == input_motions.shape
-            decoder_nll = mean_flat(decoder_nll) / np.log(2.0)
-            # print("decoder_nll shape:", decoder_nll.shape) # [10] -> one value per sample
-            decoder_nll_value = decoder_nll.mean()
-            print(f'Repetition {rep_i} - Decoder NLL: {decoder_nll_value:.4f}')
 
         if model.data_rep == 'hml_vec':
             n_joints = 22 if sample.shape[1] == 263 else 21 # sample.shape = [bs, 263, 1, 196]
@@ -277,10 +268,9 @@ def main():
         all_motions.append(sample.cpu().numpy())
         all_lengths.append(model_kwargs['y']['lengths'].cpu().numpy())
         if args.learning_var:
-            # all_variances.append(log_variance.cpu().numpy())
             all_variances.append(uncertainty_factor.cpu().numpy())
             all_mean_fluctuations.append(uncertainty_factor_1.cpu().numpy())
-        print(f"created {len(all_motions) * args.batch_size} samples")
+        # print(f"created {len(all_motions) * args.batch_size} samples")
 
     # mpjpe = sum(mean_errors) / len(mean_errors) if mean_errors else float('inf')
     # print(f'---> Overall MPJPE = {mpjpe*1000:.4f}')
@@ -291,7 +281,7 @@ def main():
             print(f'---> MPJPE at {time_ms} s = {avg_error*1000:.4f}')
     
     all_motions = np.concatenate(all_motions, axis=0) # [num_samples*num_repetitions, njoints, 3, seqlen]
-    all_motions = all_motions[:total_num_samples]  # [num_samples*num_repetitions, njoints, 3, seqlen]
+    # all_motions = all_motions[:total_num_samples]  # [num_samples*num_repetitions, njoints, 3, seqlen]
     
     # Compute uncertainty factor based on standard deviation between repetitions
     all_motions_tensor = torch.from_numpy(all_motions)
@@ -314,7 +304,7 @@ def main():
     if args.learning_var:
         uncertainty_particle_ause = uncertainty_particle[0::args.num_repetitions] # [num_samples, 3, seqlen, njoints]
         uncertainty_particle_ause = uncertainty_particle_ause.mean(dim=1) # [num_samples, seqlen, njoints]
-        sparsification_errors_up, oracle, sparsification_levels_up = calculate_ause(per_joint_errors_mean, uncertainty_particle_ause, model_kwargs['y']['lengths'], 'sparsification_error_plot.png')
+        sparsification_errors_up, oracle, sparsification_levels_up = calculate_ause(per_joint_errors_mean, uncertainty_particle_ause, model_kwargs['y']['lengths'])
         plt.figure(figsize=(10, 6))
         plt.plot(sparsification_levels_up, sparsification_errors_up, marker='s', linestyle='--', color='b', label='Mean Fluctuations')
         plt.plot(sparsification_levels_up, oracle, marker='s', linestyle='--', color='g', label='Oracle')
