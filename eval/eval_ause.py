@@ -59,7 +59,7 @@ def main():
 
     # nb_samples_longer_than_three_seconds = 4328
     nb_samples_longer_than_three_seconds = 4288
-    nb_samples_longer_than_three_seconds = 320
+    # nb_samples_longer_than_three_seconds = 320
     start_index = total_samples - nb_samples_longer_than_three_seconds
     subset_indices = list(range(start_index, total_samples))
     subset_dataset = torch.utils.data.Subset(data.dataset, subset_indices)
@@ -202,8 +202,8 @@ def main():
                     print(f'Batch {idx} - Repetition {rep_i} - Time {times_ms[t_idx]}s - MPJPE: {mpjpe_at_time*1000:.4f}')
 
             if args.learning_var:
-                uncertainty_factor_ause = uncertainty_factor.squeeze(1)
-                uncertainty_factor1_ause = uncertainty_factor_1.squeeze(1)
+                uncertainty_factor_ause = uncertainty_factor.squeeze(1) # [bs, 22, 196]
+                uncertainty_factor1_ause = uncertainty_factor_1.squeeze(1) # [bs, 1, 196, 22]
                 sparsification_errors_lg, oracle, sparsification_levels_lg = calculate_ause(per_joint_errors, uncertainty_factor_ause, model_kwargs['y']['lengths'])
                 sparsification_errors_mf, oracle, sparsification_levels_mf = calculate_ause(per_joint_errors, uncertainty_factor1_ause, model_kwargs['y']['lengths'])
 

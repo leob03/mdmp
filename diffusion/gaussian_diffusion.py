@@ -707,37 +707,43 @@ class GaussianDiffusion:
             if dump_steps is not None and i in dump_steps:
                 dump.append(deepcopy(sample["sample"]))
             final = sample
-            if i >= 30 and i % 2 == 0:  # Track every 5th step from 20 to 45, and all steps from 45 onwards
-                means.append(sample["sample"].detach().cpu())
+            # if i >= 30 and i % 2 == 0: # track the mean of the last 20 steps of every 2nd diffusion step from 30 to 50
+            means.append(sample["sample"].detach().cpu())
         if dump_steps is not None:
             return dump
         if self.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
             means = torch.stack(means, dim=0)  # Shape: [10, bs, 263, 1, 196]
+            # num_samples = means.shape[0]
 
             # # Plot mean evolution
-            # means = means.cpu().permute(0, 1, 3, 4, 2).float() # [50, bs, 1, 196, 263]
-            # means = means[..., 4:(22 - 1) * 3 + 4] # [50, bs, 1, 196, 63]
-            # means = means.view(means.shape[:-1] + (-1, 3)) # [50, bs, 1, 196, 21, 3]
-            # means = means.view(50, -1, *means.shape[3:]).permute(0, 1, 3, 4, 2) # [50, bs, 21, 3, 196]
-            # means = means.mean(dim=3) # [50, bs, 21, 196]
-
-            # # Select last 20 steps and only even steps
-            # means = means[-20::2]
+            # means = means.cpu().permute(0, 1, 3, 4, 2).float() # [diffusion_steps, num_samples, 1, 196, 263]
+            # means = means[..., 4:(22 - 1) * 3 + 4] # [diffusion_steps, num_samples, 1, 196, 63]
+            # means = means.view(means.shape[:-1] + (-1, 3)) # [diffusion_steps, num_samples, 1, 196, 21, 3]
+            # means = means.squeeze(2).permute(0, 1, 3, 4, 2) # [diffusion_steps, num_samples, 21, 3, 196]
+            # means = means[:, :, :, 0, :] # [diffusion_steps, num_samples, 21, 196]
 
             # plt.figure(figsize=(16, 12))
-            # selected_joints = [0, 10, 11, 12, 20]
-            # frames = [24, 49, 74, 99]  # Frames 25, 50, 75, 100 (0-indexed)
+            # selected_joints = [9, 10, 11, 19, 20]
+            # joint_names = {
+            #     9: 'left foot',
+            #     10: 'right foot',
+            #     11: 'head',
+            #     19: 'left hand',
+            #     20: 'right hand'
+            # }
+            # # frames = [24, 49, 74, 99]  # Frames 25, 50, 75, 100 (0-indexed)
+            # frames = [24]
             
             # for i, frame in enumerate(frames):
             #     plt.subplot(2, 2, i+1)
             #     means_frame = means[:, 0, :, frame]  # Shape: [10, 21]
                 
             #     for joint in selected_joints:
-            #         plt.plot(range(30, 50, 2), means_frame[:, joint], label=f'Joint {joint}')
+            #         plt.plot(range(0, 50), means_frame[:, joint], label=joint_names[joint])
                 
-            #     plt.xlabel('Diffusion Steps (30 to 50, even steps)')
-            #     plt.ylabel('Mean Value')
-            #     plt.title(f'Evolution of Mean Values for Selected Joints at Frame {frame+1}')
+            #     plt.xlabel('Diffusion Steps')
+            #     plt.ylabel('x joint coordinate value (m)')
+            #     plt.title(f'Evolution of x coordinate for Selected Joints at Frame 100')
             #     plt.legend()
             
             # plt.tight_layout()

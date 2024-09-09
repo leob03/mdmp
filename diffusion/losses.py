@@ -10,7 +10,7 @@ import torch as th
 
 def calculate_ause(per_joint_errors, uncertainty_factor, lengths, n_bins=10):
     """
-    Compute the Area Under Sparsification Error (AUSE) to assess the quality of the uncertainty factors.
+    Compute the Sparsification Error to assess the quality of the uncertainty factors.
 
     :param per_joint_errors: Tensor of per-joint errors. Shape: [bs, 196*22]
     :param uncertainty_factor: Tensor of uncertainty factors. Shape: # [bs, 196, 22]
