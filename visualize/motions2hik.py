@@ -41,7 +41,7 @@ def motions2hik(motions,  device=0, cuda=True):
     Utility function to convert model output to a representation used by HumanIK skeletons in Maya and Motion Builder
     by converting joint positions to joint rotations in degrees. Based on visualize.vis_utils.npy2obj
 
-    :param motions: numpy array containing MDM model output [num_reps, num_joints, num_params (xyz), num_frames
+    :param motions: numpy array containing MDMP model output [num_reps, num_joints, num_params (xyz), num_frames
     :param device:
     :param cuda:
 

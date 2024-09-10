@@ -21,7 +21,7 @@ For windows use [this](https://www.geeksforgeeks.org/how-to-install-ffmpeg-on-wi
 Setup conda env:
 ```shell
 conda env create -f environment.yml
-conda activate mdm
+conda activate mdmp
 python -m spacy download en_core_web_sm
 pip install git+https://github.com/openai/CLIP.git
 ```
@@ -301,26 +301,26 @@ The output will look like this (blue joints are from the input motion; orange we
 
 ![example](assets/upper_body_edit.gif)
 
-## Train your own MDM
+## Train your own MDMP
 
 <details>
   <summary><b>Text to Motion</b></summary>
 
 **HumanML3D**
 ```shell
-python -m train.train_mdm --save_dir save/my_humanml_trans_enc_512 --dataset humanml
+python -m train.train_mdmp --save_dir save/my_humanml_trans_enc_512 --dataset humanml
 ```
 
 **KIT**
 ```shell
-python -m train.train_mdm --save_dir save/my_kit_trans_enc_512 --dataset kit
+python -m train.train_mdmp --save_dir save/my_kit_trans_enc_512 --dataset kit
 ```
 </details>
 <details>
   <summary><b>Action to Motion</b></summary>
 
 ```shell
-python -m train.train_mdm --save_dir save/my_name --dataset {humanact12,uestc} --cond_mask_prob 0 --lambda_rcxyz 1 --lambda_vel 1 --lambda_fc 1
+python -m train.train_mdmp --save_dir save/my_name --dataset {humanact12,uestc} --cond_mask_prob 0 --lambda_rcxyz 1 --lambda_vel 1 --lambda_fc 1
 ```
 </details>
 
@@ -328,7 +328,7 @@ python -m train.train_mdm --save_dir save/my_name --dataset {humanact12,uestc} -
   <summary><b>Unconstrained</b></summary>
 
 ```shell
-python -m train.train_mdm --save_dir save/my_name --dataset humanact12 --cond_mask_prob 0 --lambda_rcxyz 1 --lambda_vel 1 --lambda_fc 1  --unconstrained
+python -m train.train_mdmp --save_dir save/my_name --dataset humanact12 --cond_mask_prob 0 --lambda_rcxyz 1 --lambda_vel 1 --lambda_fc 1  --unconstrained
 ```
 </details>
 

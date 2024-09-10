@@ -9,7 +9,7 @@ from data_loaders.humanml.scripts.motion_process import recover_from_ric
 
 
 
-class MDM(nn.Module):
+class MDMP(nn.Module):
     def __init__(self, modeltype, njoints, nfeats, num_actions, translation, pose_rep, glob, glob_rot,
                  latent_dim=256, ff_size=1024, num_layers=8, num_heads=4, dropout=0.1,
                  ablation=None, activation="gelu", legacy=False, data_rep='rot6d', dataset='amass', clip_dim=512,
@@ -61,30 +61,14 @@ class MDM(nn.Module):
         self.sequence_pos_encoder = PositionalEncoding(self.latent_dim, self.dropout)
         self.emb_trans_dec = emb_trans_dec
 
-        if self.arch == 'trans_enc':
-            print("TRANS_ENC init")
-            seqTransEncoderLayer = nn.TransformerEncoderLayer(d_model=self.latent_dim,
-                                                              nhead=self.num_heads,
-                                                              dim_feedforward=self.ff_size,
-                                                              dropout=self.dropout,
-                                                              activation=self.activation)
+        seqTransEncoderLayer = nn.TransformerEncoderLayer(d_model=self.latent_dim,
+                                                            nhead=self.num_heads,
+                                                            dim_feedforward=self.ff_size,
+                                                            dropout=self.dropout,
+                                                            activation=self.activation)
 
-            self.seqTransEncoder = nn.TransformerEncoder(seqTransEncoderLayer,
-                                                         num_layers=self.num_layers)
-        elif self.arch == 'trans_dec':
-            print("TRANS_DEC init")
-            seqTransDecoderLayer = nn.TransformerDecoderLayer(d_model=self.latent_dim,
-                                                              nhead=self.num_heads,
-                                                              dim_feedforward=self.ff_size,
-                                                              dropout=self.dropout,
-                                                              activation=activation)
-            self.seqTransDecoder = nn.TransformerDecoder(seqTransDecoderLayer,
-                                                         num_layers=self.num_layers)
-        elif self.arch == 'gru':
-            print("GRU init")
-            self.gru = nn.GRU(self.latent_dim, self.latent_dim, num_layers=self.num_layers, batch_first=True)
-        else:
-            raise ValueError('Please choose correct architecture [trans_enc, trans_dec, gru]')
+        self.seqTransEncoder = nn.TransformerEncoder(seqTransEncoderLayer,
+                                                        num_layers=self.num_layers)
 
         self.embed_timestep = TimestepEmbedder(self.latent_dim, self.sequence_pos_encoder)
 
@@ -171,13 +155,6 @@ class MDM(nn.Module):
             action_emb = self.embed_action(y['action'])
             emb += self.mask_cond(action_emb, force_mask=force_mask)
 
-        if self.arch == 'gru':
-            x_reshaped = x.reshape(bs, njoints*nfeats, 1, nframes)
-            emb_gru = emb.repeat(nframes, 1, 1)     #[#frames, bs, d]
-            emb_gru = emb_gru.permute(1, 2, 0)      #[bs, d, #frames]
-            emb_gru = emb_gru.reshape(bs, self.latent_dim, 1, nframes)  #[bs, d, 1, #frames]
-            x = torch.cat((x_reshaped, emb_gru), axis=1)  #[bs, d+joints*feat, 1, #frames]
-
         #Incorporate motion input
         if 'motion_embed' in y.keys() and 'motion_embed_mask' in y.keys():
             # print('motion_embed' in y.keys(), "multi-modal input detected")
@@ -187,29 +164,9 @@ class MDM(nn.Module):
 
         x = self.input_process(x) # [bs, seqlen, d]
 
-
-        if self.arch == 'trans_enc':
-            # adding the timestep embed
-            # emb_0 = torch.zeros_like(emb)
-            xseq = torch.cat((emb, x), axis=0)  # [seqlen+1, bs, d]
-            xseq = self.sequence_pos_encoder(xseq)  # [seqlen+1, bs, d]
-            output = self.seqTransEncoder(xseq)[1:]  # , src_key_padding_mask=~maskseq)  # [seqlen, bs, d]
-
-        elif self.arch == 'trans_dec':
-            if self.emb_trans_dec:
-                xseq = torch.cat((emb, x), axis=0)
-            else:
-                xseq = x
-            xseq = self.sequence_pos_encoder(xseq)  # [seqlen+1, bs, d]
-            if self.emb_trans_dec:
-                output = self.seqTransDecoder(tgt=xseq, memory=emb)[1:] # [seqlen, bs, d] # FIXME - maybe add a causal mask
-            else:
-                output = self.seqTransDecoder(tgt=xseq, memory=emb)
-        elif self.arch == 'gru':
-            xseq = x
-            xseq = self.sequence_pos_encoder(xseq)  # [seqlen, bs, d]
-            output, _ = self.gru(xseq)
-
+        xseq = torch.cat((emb, x), axis=0)  # [seqlen+1, bs, d]
+        xseq = self.sequence_pos_encoder(xseq)  # [seqlen+1, bs, d]
+        output = self.seqTransEncoder(xseq)[1:]  # , src_key_padding_mask=~maskseq)  # [seqlen, bs, d]
         output = self.output_process(output)  # [bs, njoints, nfeats, nframes]
         return output
 
@@ -239,7 +196,6 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        # not used in the final model
         x = x + self.pe[:x.shape[0], :]
         return self.dropout(x)
 
@@ -383,7 +339,7 @@ class OutputProcess_wGCN(nn.Module):
         #     output = torch.cat((first_pose, vel), axis=0)
         else:
             raise ValueError
-        # Update: Reshape to include doubled features for mean and variance
+        # Updated: Reshape to include doubled features for mean and variance
         if self.learning_var:
             # print('output shape', output.shape) # [seqlen, bs, 132]
             output = output.reshape(nframes, bs, 2 * self.input_feats, self.nfeats)  # Updated

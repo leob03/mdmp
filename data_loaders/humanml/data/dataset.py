@@ -769,7 +769,7 @@ class HumanML3D(data.Dataset):
 
         assert len(self.t2m_dataset) > 1, 'You loaded an empty dataset, ' \
                                           'it is probably because your data dir has only texts and no motions.\n' \
-                                          'To train and evaluate MDM you should get the FULL data as described ' \
+                                          'To train and evaluate MDMP you should get the FULL data as described ' \
                                           'in the README file.'
 
     def __getitem__(self, item):

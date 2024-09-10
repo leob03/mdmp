@@ -118,7 +118,7 @@ def build_evaluators(opt):
     return text_enc, motion_enc, movement_enc
 
 # our wrapper
-class EvaluatorMDMWrapper(object):
+class EvaluatorMDMPWrapper(object):
 
     def __init__(self, dataset_name, device):
         opt = {

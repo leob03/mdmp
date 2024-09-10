@@ -15,7 +15,7 @@ from diffusion.fp16_util import MixedPrecisionTrainer
 from diffusion.resample import LossAwareSampler, UniformSampler
 from tqdm import tqdm
 from diffusion.resample import create_named_schedule_sampler
-from data_loaders.humanml.networks.evaluator_wrapper import EvaluatorMDMWrapper
+from data_loaders.humanml.networks.evaluator_wrapper import EvaluatorMDMPWrapper
 from eval import eval_humanml, eval_humanact12_uestc
 from data_loaders.get_data import get_dataset_loader
 from data_loaders.humanml.scripts.motion_process import recover_from_ric
@@ -94,9 +94,9 @@ class TrainLoop:
             self.eval_gt_data = get_dataset_loader(name=args.dataset, batch_size=args.eval_batch_size, num_frames=None,
                                                    split=args.eval_split,
                                                    hml_mode='gt')
-            self.eval_wrapper = EvaluatorMDMWrapper(args.dataset, dist_util.dev())
+            self.eval_wrapper = EvaluatorMDMPWrapper(args.dataset, dist_util.dev())
             self.eval_data = {
-                'test': lambda: eval_humanml.get_mdm_loader(
+                'test': lambda: eval_humanml.get_mdmp_loader(
                     model, diffusion, args.eval_batch_size,
                     gen_loader, mm_num_samples, mm_num_repeats, gen_loader.dataset.opt.max_motion_length,
                     args.eval_num_samples, scale=1.,

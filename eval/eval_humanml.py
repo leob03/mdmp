@@ -1,7 +1,6 @@
 from utils.parser_util import evaluation_parser
 from utils.fixseed import fixseed
 from datetime import datetime
-# from data_loaders.humanml.motion_loaders.model_motion_loaders import get_mdm_loader
 from data_loaders.humanml.motion_loaders.model_motion_loaders import get_mdmp_loader  # get_motion_loader
 from data_loaders.humanml.utils.metrics import *
 from data_loaders.humanml.networks.evaluator_wrapper import EvaluatorMDMWrapper
@@ -440,5 +439,5 @@ if __name__ == '__main__':
         )
     }
 
-    eval_wrapper = EvaluatorMDMWrapper(args.dataset, dist_util.dev())
+    eval_wrapper = EvaluatorMDMPWrapper(args.dataset, dist_util.dev())
     evaluation(eval_wrapper, gt_loader, eval_motion_loaders, log_file, replication_times, diversity_times, mm_num_times, learning_var, start_idx, get_xyz, run_mm=run_mm)
