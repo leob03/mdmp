@@ -126,9 +126,11 @@ t2m/
 kit/
 glove/
 save/
-dataset/
 body_models/smpl/
+dataset/Human36M
+dataset/HumanAct12
+dataset/HumanML3D
+dataset/uestc
 logs/
-assets/
-sub_modules/
+sub_modules/CLIP
 .vscode/
