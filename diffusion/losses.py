@@ -8,6 +8,55 @@ https://github.com/hojonathanho/diffusion/blob/1e0dceb3b3495bbe19116a5e1b3596cd0
 import numpy as np
 import torch as th
 
+def evaluate_sparsification_error(per_joint_errors, uncertainty_factor, n_bins=10):
+    """
+    Compute the Sparsification Error to assess the quality of the uncertainty factors.
+
+    :param per_joint_errors: Tensor of per-joint errors. Shape: [bs, seqlen, 22]
+    :param uncertainty_factor: Tensor of uncertainty factors. Shape: # [bs, seqlen, 22]
+    :param n_bins: Number of bins to use for the AUSE calculation.
+    note that seqlen is the shortest length in the batch and is likely to be less than 196.
+    """
+    # per_joint_errors = per_joint_errors.reshape(-1)
+    # uncertainty_factor = uncertainty_factor.reshape(-1)
+
+    # Sort by uncertainty
+    sorted_indices_by_uncertainty = uncertainty_factor.argsort()
+    sorted_errors_by_uncertainty = per_joint_errors[sorted_indices_by_uncertainty]  # Sorted per-joint errors by uncertainty
+    sorted_indices_by_error = per_joint_errors.argsort()
+    sorted_errors_by_error = per_joint_errors[sorted_indices_by_error]  # Sorted per-joint errors by error  
+
+    # Calculate the total error (mean of all per-joint errors)
+    total_error = sorted_errors_by_uncertainty.sum().item()
+
+    # Compute sparsification error at different levels
+    sparsification_errors = []
+    sparsification_levels = []
+    sparsification_errors_by_error = []
+    for i in range(0, n_bins+1):
+        # Sparsification level: keep (1 - i/n_bins) fraction of the data
+        threshold_index = int((1 - i/n_bins) * len(sorted_errors_by_uncertainty))
+        if threshold_index == 0:
+            continue
+        
+        sparsified_errors = sorted_errors_by_uncertainty[:threshold_index]  # Shape: [threshold_index]
+        sparsified_error = sparsified_errors.sum().item()/total_error
+        # uncertainty_ration = (total_error - sparsified_error) / sparsified_error
+
+        sparsified_errors_by_error = sorted_errors_by_error[:threshold_index]  # Shape: [threshold_index]
+        sparsified_error_by_error = sparsified_errors_by_error.sum().item()/total_error
+        # error_ratio = (total_error - sparsified_error_by_error) / sparsified_error_by_error
+
+        sparsification_errors.append(sparsified_error)
+        sparsification_errors_by_error.append(sparsified_error_by_error)
+
+        # sparsification_errors.append(uncertainty_ration)
+        # sparsification_errors_by_error.append(error_ratio)
+
+        sparsification_levels.append(i/n_bins)
+
+    return sparsification_errors, sparsification_errors_by_error, sparsification_levels
+
 def calculate_ause(per_joint_errors, uncertainty_factor, lengths, n_bins=10):
     """
     Compute the Sparsification Error to assess the quality of the uncertainty factors.

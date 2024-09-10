@@ -19,7 +19,7 @@ from data_loaders.humanml.utils.plot_script import plot_3d_motion_with_gt
 import shutil
 from data_loaders.tensors import collate
 from tqdm import tqdm
-from diffusion.losses import calculate_ause, discretized_gaussian_log_likelihood
+from diffusion.losses import evaluate_sparsification_error
 from diffusion.nn import mean_flat, sum_flat
 import matplotlib.pyplot as plt
 
@@ -85,8 +85,8 @@ def main():
     all_motions = []
     all_variances = []
     all_mean_fluctuations = []
-    all_lengths = []
     all_text = []
+    per_joint_errors_rep = []
     per_joint_errors_all = []
     uncertainty_particle_ause_all = []
 
@@ -187,8 +187,7 @@ def main():
             target_xyz_reshaped = input_motions_reshaped.permute(0, 3, 1, 2).reshape(args.batch_size, -1, 3) # torch.size([bs, 196*22, 3])
             pred_xyz_reshaped = sample.permute(0, 3, 1, 2).reshape(args.batch_size, -1, 3) # torch.size([bs, 196*22, 3])
             per_joint_errors = torch.norm(target_xyz_reshaped - pred_xyz_reshaped, 2, 2) # torch.Size([bs, 196*22])
-            per_joint_errors_all.append(per_joint_errors)
-
+            per_joint_errors_rep.append(per_joint_errors)
 
             errors_reshaped = per_joint_errors.mean(dim=0) # Mean over batch #torch.Size([196*22])
             overtime_3d_err = errors_reshaped.view(-1, n_joints).mean(dim=1) # torch.Size([196])
@@ -201,11 +200,11 @@ def main():
                     mpjpe_specific_times[t_idx].append(mpjpe_at_time.item())
                     print(f'Batch {idx} - Repetition {rep_i} - Time {times_ms[t_idx]}s - MPJPE: {mpjpe_at_time*1000:.4f}')
 
-            if args.learning_var:
-                uncertainty_factor_ause = uncertainty_factor.squeeze(1) # [bs, 22, 196]
-                uncertainty_factor1_ause = uncertainty_factor_1.squeeze(1) # [bs, 1, 196, 22]
-                sparsification_errors_lg, oracle, sparsification_levels_lg = calculate_ause(per_joint_errors, uncertainty_factor_ause, model_kwargs['y']['lengths'])
-                sparsification_errors_mf, oracle, sparsification_levels_mf = calculate_ause(per_joint_errors, uncertainty_factor1_ause, model_kwargs['y']['lengths'])
+            # if args.learning_var:
+            #     uncertainty_factor_ause = uncertainty_factor.squeeze(1) # [bs, 22, 196]
+            #     uncertainty_factor1_ause = uncertainty_factor_1.squeeze(1) # [bs, 1, 196, 22]
+            #     sparsification_errors_lg, oracle, sparsification_levels_lg = calculate_ause(per_joint_errors, uncertainty_factor_ause, model_kwargs['y']['lengths'])
+            #     sparsification_errors_mf, oracle, sparsification_levels_mf = calculate_ause(per_joint_errors, uncertainty_factor1_ause, model_kwargs['y']['lengths'])
 
             if args.unconstrained:
                 all_text += ['unconstrained'] * args.num_samples
@@ -214,12 +213,13 @@ def main():
                 all_text += model_kwargs['y'][text_key]
 
             all_motions.append(sample.cpu().numpy())
-            all_lengths.append(model_kwargs['y']['lengths'].cpu().numpy())
             if args.learning_var:
                 all_variances.append(uncertainty_factor.cpu().numpy())
                 all_mean_fluctuations.append(uncertainty_factor_1.cpu().numpy())
         
         all_motions_np = np.concatenate(all_motions, axis=0) # [batch_size*num_repetitions, njoints, 3, seqlen]
+        per_joint_errors_rep_tensor = torch.cat(per_joint_errors_rep, dim=0)  # [num_samples*num_repetitions, 196*22]
+        per_joint_errors_rep = []
         
         # Compute uncertainty factor based on standard deviation between repetitions
         all_motions_tensor = torch.from_numpy(all_motions_np)
@@ -236,21 +236,33 @@ def main():
         uncertainty_particle = uncertainty_particle.reshape(-1, *uncertainty_particle.shape[2:])  # [batch_size*num_repetitions, njoints, 3, seqlen]
         uncertainty_particle = uncertainty_particle.permute(0, 2, 3, 1)  # [batch_size*num_repetitions, 3, seqlen, njoints]
 
-        uncertainty_particle_ause = uncertainty_particle[0::args.num_repetitions] # [batch_size, 3, seqlen, njoints]
-        uncertainty_particle_ause = uncertainty_particle_ause.mean(dim=1) # [batch_size, seqlen, njoints]
+        uncertainty_particle_ause = uncertainty_particle.mean(dim=1) # [batch_size*num_repetitions, seqlen, njoints]
+
+        shortest_length = model_kwargs['y']['lengths'].min().item()
+
+        # Truncate all tensors to the shortest length
+        B, nb_frames, nb_joints = uncertainty_particle_ause.shape # B=batch_size*num_repetitions, nb_frames=196, nb_joints=22
+        per_joint_errors = per_joint_errors_rep_tensor.view(B, nb_frames, nb_joints)  # Shape: [B, 196, 22]
+        per_joint_errors = per_joint_errors[:, :shortest_length, :] # Shape: [B, shortest_length, 22]
+        uncertainty_particle_ause = uncertainty_particle_ause[:, :shortest_length, :] # Shape: [B, shortest_length, 22]
 
         uncertainty_particle_ause_all.append(uncertainty_particle_ause)
+        per_joint_errors_all.append(per_joint_errors) 
+
     
-    uncertainty_particle_ause_all = torch.stack(uncertainty_particle_ause_all).view(-1, 196, n_joints) # [total_nb_batches*batch_size, seqlen, njoints]
+    # uncertainty_particle_ause_all = torch.stack(uncertainty_particle_ause_all).view(args.batch_size*args.num_repetitions*(idx+1), -1, n_joints) # [total_nb_batches*batch_size*num_repetitions, seqlen, njoints]
+    uncertainty_particle_ause_all = [tensor.flatten() for tensor in uncertainty_particle_ause_all]
+    uncertainty_particle_ause_all = torch.cat(uncertainty_particle_ause_all, dim=0)
 
-    per_joint_errors_all = torch.cat(per_joint_errors_all, dim=0)  # [batch_size*num_repetitions, 196*22]
-    per_joint_errors_all = per_joint_errors_all.view(args.num_repetitions, -1, 196*22)  # [num_repetitions, batch_size, 196*22]
-    per_joint_errors_mean = per_joint_errors_all.mean(dim=0)  # [batch_size, 196*22]
+    # per_joint_errors_all = torch.cat(per_joint_errors_all, dim=0)  # [total_nb_batches*batch_size*num_repetitions, 196*22]
+    # per_joint_errors_all = torch.stack(per_joint_errors_all).view(args.batch_size*args.num_repetitions*(idx+1), -1, n_joints) # [total_nb_batches*batch_size*num_repetitions, seqlen, njoints]
+    per_joint_errors_all = [tensor.flatten() for tensor in per_joint_errors_all]
+    per_joint_errors_all = torch.cat(per_joint_errors_all, dim=0)
 
-    sparsification_errors_up, oracle, sparsification_levels_up = calculate_ause(per_joint_errors_mean, uncertainty_particle_ause_all, model_kwargs['y']['lengths'])
+    sparsification_errors_up, oracle, sparsification_levels_up = evaluate_sparsification_error(per_joint_errors_all, uncertainty_particle_ause_all)
     plt.figure(figsize=(10, 6))
-    plt.plot(sparsification_levels_lg, sparsification_errors_lg, marker='o', linestyle='-', color='b', label='Predicted Variance')
-    plt.plot(sparsification_levels_mf, sparsification_errors_mf, marker='s', linestyle=':', color='b', label='Denoising Fluctuations')
+    # plt.plot(sparsification_levels_lg, sparsification_errors_lg, marker='o', linestyle='-', color='b', label='Predicted Variance')
+    # plt.plot(sparsification_levels_mf, sparsification_errors_mf, marker='s', linestyle=':', color='b', label='Denoising Fluctuations')
     plt.plot(sparsification_levels_up, sparsification_errors_up, marker='s', linestyle='--', color='b', label='Mode Divergence')
     plt.plot(sparsification_levels_up, oracle, marker='s', linestyle='--', color='g', label='Oracle')
     plt.xlabel('Sparsification Level (Fraction of Data Removed)')

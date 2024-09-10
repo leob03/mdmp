@@ -229,6 +229,7 @@ def main():
         pred_xyz_reshaped = sample.permute(0, 3, 1, 2).reshape(args.batch_size, -1, 3) # torch.size([bs, 196*22, 3])
         per_joint_errors = torch.norm(target_xyz_reshaped - pred_xyz_reshaped, 2, 2) # torch.Size([bs, 196*22])
         per_joint_errors_all.append(per_joint_errors)
+
         errors_reshaped = per_joint_errors.mean(dim=0) # Mean over batch #torch.Size([196*22])
         overtime_3d_err = errors_reshaped.view(-1, n_joints).mean(dim=1) # torch.Size([196])
 
@@ -246,18 +247,6 @@ def main():
             uncertainty_factor1_ause = uncertainty_factor_1.squeeze(1)
             sparsification_errors_lg, oracle, sparsification_levels_lg = calculate_ause(per_joint_errors, uncertainty_factor_ause, model_kwargs['y']['lengths'])
             sparsification_errors_mf, oracle, sparsification_levels_mf = calculate_ause(per_joint_errors, uncertainty_factor1_ause, model_kwargs['y']['lengths'])
-        #     plt.figure(figsize=(10, 6))
-        #     plt.plot(sparsification_levels_lg, sparsification_errors_lg, marker='o', linestyle='-', color='b', label='Predicted Variance')
-        #     plt.plot(sparsification_levels_mf, sparsification_errors_mf, marker='s', linestyle=':', color='b', label='Denoising Fluctuations')
-        #     plt.plot(sparsification_levels_mf, oracle, marker='s', linestyle='--', color='g', label='Oracle')
-        #     plt.xlabel('Sparsification Level (Fraction of Data Removed)')
-        #     plt.ylabel('Sparsification Error')
-        #     plt.title('Sparsification Error vs. Sparsification Level')
-        #     plt.legend()
-        #     plt.grid(True)
-        #     plt.savefig('sparsification_error_plot3.png')
-        #     plt.close()
-        # exit()
 
         if args.unconstrained:
             all_text += ['unconstrained'] * args.num_samples
@@ -299,12 +288,10 @@ def main():
 
     # Compute AUSE for uncertainty_particle
     per_joint_errors_all = torch.cat(per_joint_errors_all, dim=0)  # [num_samples*num_repetitions, 196*22]
-    per_joint_errors_all = per_joint_errors_all.view(args.num_repetitions, args.num_samples, -1)  # [num_repetitions, num_samples, 196*22]
-    per_joint_errors_mean = per_joint_errors_all.mean(dim=0)  # [num_samples, 196*22]
+
     if args.learning_var:
-        uncertainty_particle_ause = uncertainty_particle[0::args.num_repetitions] # [num_samples, 3, seqlen, njoints]
-        uncertainty_particle_ause = uncertainty_particle_ause.mean(dim=1) # [num_samples, seqlen, njoints]
-        sparsification_errors_up, oracle, sparsification_levels_up = calculate_ause(per_joint_errors_mean, uncertainty_particle_ause, model_kwargs['y']['lengths'])
+        uncertainty_particle_ause = uncertainty_particle.mean(dim=1) # [num_repetitions*num_samples, seqlen, njoints]
+        sparsification_errors_up, oracle, sparsification_levels_up = calculate_ause(per_joint_errors_all, uncertainty_particle_ause, model_kwargs['y']['lengths'])
         plt.figure(figsize=(10, 6))
         plt.plot(sparsification_levels_lg, sparsification_errors_lg, marker='o', linestyle='-', color='b', label='Predicted Variance')
         plt.plot(sparsification_levels_mf, sparsification_errors_mf, marker='s', linestyle=':', color='b', label='Denoising Fluctuations')
