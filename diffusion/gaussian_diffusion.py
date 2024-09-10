@@ -713,46 +713,6 @@ class GaussianDiffusion:
             return dump
         if self.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
             means = torch.stack(means, dim=0)  # Shape: [10, bs, 263, 1, 196]
-            # num_samples = means.shape[0]
-
-            # # Plot mean evolution
-            # means = means.cpu().permute(0, 1, 3, 4, 2).float() # [diffusion_steps, num_samples, 1, 196, 263]
-            # means = means[..., 4:(22 - 1) * 3 + 4] # [diffusion_steps, num_samples, 1, 196, 63]
-            # means = means.view(means.shape[:-1] + (-1, 3)) # [diffusion_steps, num_samples, 1, 196, 21, 3]
-            # means = means.squeeze(2).permute(0, 1, 3, 4, 2) # [diffusion_steps, num_samples, 21, 3, 196]
-            # means = means[:, :, :, 0, :] # [diffusion_steps, num_samples, 21, 196]
-
-            # plt.figure(figsize=(16, 12))
-            # selected_joints = [9, 10, 11, 19, 20]
-            # joint_names = {
-            #     9: 'left foot',
-            #     10: 'right foot',
-            #     11: 'head',
-            #     19: 'left hand',
-            #     20: 'right hand'
-            # }
-            # # frames = [24, 49, 74, 99]  # Frames 25, 50, 75, 100 (0-indexed)
-            # frames = [24]
-            
-            # for i, frame in enumerate(frames):
-            #     plt.subplot(2, 2, i+1)
-            #     means_frame = means[:, 0, :, frame]  # Shape: [10, 21]
-                
-            #     for joint in selected_joints:
-            #         plt.plot(range(0, 50), means_frame[:, joint], label=joint_names[joint])
-                
-            #     plt.xlabel('Diffusion Steps')
-            #     plt.ylabel('x joint coordinate value (m)')
-            #     plt.title(f'Evolution of x coordinate for Selected Joints at Frame 100')
-            #     plt.legend()
-            
-            # plt.tight_layout()
-            # plot_path = 'mean_evolution_plot_selected_joints_multiple_frames.png'
-            # plt.savefig(plot_path)
-            # plt.close()
-            # exit()
-
-            # Compute the standard deviation across the first dimension (time steps)
             mean_fluctuations = compute_cumulative_variance(means)
             return final["sample"], final["log_variance"], mean_fluctuations
         else:
