@@ -1,3 +1,7 @@
+"""
+This script is a utility for parsing and loading all the arguments of the model.
+"""
+
 from argparse import ArgumentParser
 import argparse
 import os
@@ -68,21 +72,15 @@ def add_diffusion_options(parser):
     group = parser.add_argument_group('diffusion')
     group.add_argument("--noise_schedule", default='cosine', choices=['linear', 'cosine'], type=str,
                        help="Noise schedule type")
-    group.add_argument("--diffusion_steps", default=1000, type=int,
+    group.add_argument("--diffusion_steps", default=50, type=int,
                        help="Number of diffusion steps (denoted T in the paper)")
     group.add_argument("--sigma_small", default=True, type=bool, help="Use smaller sigma values.")
 
 
 def add_model_options(parser):
     group = parser.add_argument_group('model')
-    group.add_argument("--arch", default='trans_enc',
-                       choices=['trans_enc', 'trans_dec', 'gru'], type=str,
-                       help="Architecture types as reported in the paper.")
     group.add_argument("--use_gcn", default=False, type=bool)
     group.add_argument("--emb_motion_len", default=0, type=int)
-    group.add_argument("--emb_trans_dec", default=False, type=bool,
-                       help="For trans_dec architecture only, if true, will inject condition as a class token"
-                            " (in addition to cross-attention).")
     group.add_argument("--layers", default=8, type=int,
                        help="Number of layers.")
     group.add_argument("--latent_dim", default=512, type=int,

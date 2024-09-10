@@ -1,6 +1,7 @@
 # This code is based on https://github.com/openai/guided-diffusion
 """
-Train a diffusion model on images.
+This script is the main entry point for training the MDMP model. 
+It initializes the training process, sets up the model, diffusion process, and data loader, and then send it to the training loop. 
 """
 
 import os

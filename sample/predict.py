@@ -37,10 +37,8 @@ def get_args():
     args.dataset = 'humanml'
 
     args.cond_mask_prob = 1
-    args.emb_trans_dec = False
     args.latent_dim = 512
     args.layers = 8
-    args.arch = 'trans_enc'
 
     args.noise_schedule = 'cosine'
     args.sigma_small = True

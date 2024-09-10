@@ -13,7 +13,7 @@ class MDMP(nn.Module):
     def __init__(self, modeltype, njoints, nfeats, num_actions, translation, pose_rep, glob, glob_rot,
                  latent_dim=256, ff_size=1024, num_layers=8, num_heads=4, dropout=0.1,
                  ablation=None, activation="gelu", legacy=False, data_rep='rot6d', dataset='amass', clip_dim=512,
-                 arch='trans_enc', use_gcn=True, emb_trans_dec=False, clip_version=None, learning_var=True, **kargs):
+                 use_gcn=True, clip_version=None, learning_var=True, **kargs):
         super().__init__()
 
         self.legacy = legacy
@@ -50,7 +50,6 @@ class MDMP(nn.Module):
         self.cond_mode = kargs.get('cond_mode', 'no_cond')
         # self.cond_mode = kargs.get('no_cond')
         self.cond_mask_prob = kargs.get('cond_mask_prob', 1.)
-        self.arch = arch
         self.use_gcn = use_gcn  # whether to use GCN for input and output processing
 
         if not self.use_gcn:
@@ -59,7 +58,6 @@ class MDMP(nn.Module):
             self.input_process = InputProcess_wGCN(self.data_rep, self.input_feats, self.latent_dim)
 
         self.sequence_pos_encoder = PositionalEncoding(self.latent_dim, self.dropout)
-        self.emb_trans_dec = emb_trans_dec
 
         seqTransEncoderLayer = nn.TransformerEncoderLayer(d_model=self.latent_dim,
                                                             nhead=self.num_heads,

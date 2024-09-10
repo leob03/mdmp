@@ -1,3 +1,9 @@
+# This code is based on https://github.com/openai/guided-diffusion
+"""
+This file defines a training loop for a diffusion model. 
+It initializes the training process, sets up the model, diffusion process, and data loader, and then iterates through the training data to update the model parameters. 
+The loop also includes logging and saving functionalities to track the training progress.
+"""
 import copy
 import functools
 import os
