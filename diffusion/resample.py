@@ -1,3 +1,4 @@
+# This code is based on https://github.com/openai/guided-diffusion
 from abc import ABC, abstractmethod
 
 import numpy as np

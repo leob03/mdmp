@@ -84,13 +84,6 @@ ipython_config.py
 # pyenv
 .python-version
 
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow
 __pypackages__/
 
@@ -135,8 +128,6 @@ glove/
 save/
 smpl/
 dataset/
-assets/actionrecognition/humanact12_gru.tar
-assets/actionrecognition/uestc_rot6d_stgcn.tar
 body_models/smpl/J_regressor_extra.npy
 body_models/smpl/kintree_table.pkl
 body_models/smpl/SMPL_NEUTRAL.pkl
@@ -144,3 +135,6 @@ body_models/smpl/SMPL_NEUTRAL.pkl
 body_models/smpl/smplfaces.npy
 
 logs/
+assets/
+sub_modules/
+.vscode/
