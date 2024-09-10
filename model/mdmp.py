@@ -1,3 +1,4 @@
+# This code is modified from https://github.com/GuyTevet/motion-diffusion-model
 import numpy as np
 import torch
 import torch.nn as nn

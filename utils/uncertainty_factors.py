@@ -1,3 +1,7 @@
+"""
+This file introduces some of the technics that we have tried to compute the uncertainty index associated with the mean fluctuations
+"""
+
 import torch
 
 def compute_mean_absolute_change(means):

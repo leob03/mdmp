@@ -84,7 +84,7 @@ def add_model_options(parser):
     group.add_argument("--layers", default=8, type=int,
                        help="Number of layers.")
     group.add_argument("--latent_dim", default=512, type=int,
-                       help="Transformer/GRU width.")
+                       help="Transformer width.")
     group.add_argument("--cond_mask_prob", default=.1, type=float,
                        help="The probability of masking the condition during training."
                             " For classifier-free guidance learning.")
