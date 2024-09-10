@@ -128,12 +128,7 @@ glove/
 save/
 smpl/
 dataset/
-body_models/smpl/J_regressor_extra.npy
-body_models/smpl/kintree_table.pkl
-body_models/smpl/SMPL_NEUTRAL.pkl
-
-body_models/smpl/smplfaces.npy
-
+body_models/smpl/
 logs/
 assets/
 sub_modules/
