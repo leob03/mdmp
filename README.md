@@ -76,17 +76,17 @@ python -m sample.generate_w_gt --model_path ./save/mdmp_pretrained/model00050000
 
 **You may modify the arguments based on your preferences:**
 * `--device` id. 
-* `--seed` to sample different prompts.
 * `--num_samples` to generate more samples conditionned on different inputs
 * `--num_repetitions` to generate more samples conditionned on the same inputs
+* `--model_path` to change the path if you have trained your own model and want to test it
 
 **Running those will get you:**
 * `results.npy` file with text prompts and xyz positions of the generated animation
 * `sample##_rep##.mp4` - a stick figure animation for each generated motion including the ground-truth motion for comparison.
 
-It will look something like this:
+It should look something like this:
 
-![example](assets/example_stick_fig.gif)
+![example](assets/example1.gif)
 
 </details>
 
@@ -99,17 +99,22 @@ python -m sample.generate_w_zones --model_path ./save/mdmp_pretrained/model00050
 
 **You may modify the arguments based on your preferences:**
 * `--device` id. 
-* `--seed` to sample different prompts.
 * `--num_samples` to generate more samples conditionned on different inputs
 * `--num_repetitions` to generate more samples conditionned on the same inputs
+* `--model_path` to change the path if you have trained your own model and want to test it
+
 
 **Running those will get you:**
 * `results.npy` file with text prompts and xyz positions of the generated animation
 * `sample##_rep##.mp4` - a stick figure animation for each generated motion including zones of presence around 'end-effector' joints to assess uncertainty.
+
+It should look something like this:
+
+![example](assets/example2.gif)
 </details>
 
 <details>
-  <summary><b>Demo with Human Meshes (Requires Blender)</b></summary>
+  <summary><b>Demo with SMPL Meshes (with Blender)</b></summary>
 
 ```shell
 python -m sample.generate_for_meshes --model_path ./save/mdmp_pretrained/model000500000.pt --num_samples 3 --num_repetitions 3
@@ -117,20 +122,19 @@ python -m sample.generate_for_meshes --model_path ./save/mdmp_pretrained/model00
 
 **You may also define:**
 * `--device` id.
-* `--seed` to sample different prompts.
-* `--motion_length` (text-to-motion only) in seconds (maximum is 9.8[sec]).
+* `--num_samples` to generate more samples conditionned on different inputs
+* `--num_repetitions` to generate more samples conditionned on the same inputs
+* `--model_path` to change the path if you have trained your own model and want to test it
 
 **Running those will get you:**
 * `results.npy` file with text prompts and xyz positions of the generated animation
 * `sample##_rep##.mp4` - a stick figure animation for each generated motion with no ground-truth, no floor, nor zones of presence.
 
-</details>
+It should look something like this:
 
-You can stop here, or render the SMPL mesh using the following script.
+![example](assets/example3.gif)
 
-### Render SMPL mesh
-
-To create SMPL mesh per frame run:
+Frow now on if you want to render the SMPL mesh you should chose an `.mp4` file that you would like to render, copy its relative path and use the following script to create SMPL parameters of that file:
 
 ```shell
 python -m visualize.render_mesh --input_path /path/to/mp4/stick/figure/file
@@ -140,140 +144,67 @@ python -m visualize.render_mesh --input_path /path/to/mp4/stick/figure/file
 * `sample##_rep##_smpl_params.npy` - SMPL parameters (thetas, root translations, vertices and faces)
 * `sample##_rep##_obj` - Mesh per frame in `.obj` format.
 
-**Notes:**
-* The `.obj` can be integrated into Blender/Maya/3DS-MAX and rendered using them.
-* This script is running [SMPLify](https://smplify.is.tue.mpg.de/) and needs GPU as well (can be specified with the `--device` flag).
-* **Important** - Do not change the original `.mp4` path before running the script.
-
-**Notes for 3d makers:**
-* You have two ways to animate the sequence:
-  1. Use the [SMPL add-on](https://smpl.is.tue.mpg.de/index.html) and the theta parameters saved to `sample##_rep##_smpl_params.npy` (we always use beta=0 and the gender-neutral model).
-  1. A more straightforward way is using the mesh data itself. All meshes have the same topology (SMPL), so you just need to keyframe vertex locations. 
-     Since the OBJs are not preserving vertices order, we also save this data to the `sample##_rep##_smpl_params.npy` file for your convenience.
-
-## Motion Editing
-
-* This feature is available for text-to-motion datasets (HumanML3D and KIT).
-* In order to use it, you need to acquire the full data (not just the texts).
-* We support the two modes presented in the paper: `in_between` and `upper_body`.
-
-### Unconditioned editing
-
-```shell
-python -m sample.edit --model_path ./save/humanml_trans_enc_512/model000200000.pt --edit_mode in_between
-```
-
-**You may also define:**
-* `--num_samples` (default is 10) / `--num_repetitions` (default is 3).
-* `--device` id.
-* `--seed` to sample different prompts.
-* `--edit_mode upper_body` For upper body editing (lower body is fixed).
-
-
-The output will look like this (blue frames are from the input motion; orange were generated by the model):
-
-![example](assets/in_between_edit.gif)
-
-* As in *Motion Synthesis*, you may follow the **Render SMPL mesh** section to obtain meshes for your edited motions.
-
-### Text conditioned editing
-
-Just add the text conditioning using `--text_condition`. For example:
-
-```shell
-python -m sample.edit --model_path ./save/humanml_trans_enc_512/model000200000.pt --edit_mode upper_body --text_condition "A person throws a ball"
-```
-
-The output will look like this (blue joints are from the input motion; orange were generated by the model):
-
-![example](assets/upper_body_edit.gif)
+</details>
 
 ## Train your own MDMP
 
 <details>
-  <summary><b>Text to Motion</b></summary>
 
 **HumanML3D**
 ```shell
-python -m train.train_mdmp --save_dir save/my_humanml_trans_enc_512 --dataset humanml
+python -m train.train_mdmp --save_dir save/my_own_mdmp --dataset humanml
 ```
 
-**KIT**
-```shell
-python -m train.train_mdmp --save_dir save/my_kit_trans_enc_512 --dataset kit
-```
-</details>
-<details>
-  <summary><b>Action to Motion</b></summary>
-
-```shell
-python -m train.train_mdmp --save_dir save/my_name --dataset {humanact12,uestc} --cond_mask_prob 0 --lambda_rcxyz 1 --lambda_vel 1 --lambda_fc 1
-```
-</details>
-
-<details>
-  <summary><b>Unconstrained</b></summary>
-
-```shell
-python -m train.train_mdmp --save_dir save/my_name --dataset humanact12 --cond_mask_prob 0 --lambda_rcxyz 1 --lambda_vel 1 --lambda_fc 1  --unconstrained
-```
-</details>
-
-* Use `--diffusion_steps 50` to train the faster model with less diffusion steps.
+* Use `--diffusion_steps 50` to train a faster model with less diffusion steps.
 * Use `--device` to define GPU id.
 * Add `--train_platform_type {ClearmlPlatform, TensorboardPlatform}` to track results with either [ClearML](https://clear.ml/) or [Tensorboard](https://www.tensorflow.org/tensorboard).
-* Add `--eval_during_training` to run a short (90 minutes) evaluation for each saved checkpoint. 
-  This will slow down training but will give you better monitoring.
-* Add `--use_gcn=True` to try the GCN version
+* Add `--use_gcn true` to try the GCN version
+* Change `--emb_motion_len` to a value lower than 50 if you want you model to be conditionned on shorter motion sequences
+* Add `--num_steps` to specificy the number of training steps and train more or less
+* Use `--batch_size` to change to a smaller batch size if your GPU memory gets in the way
 
 ## Evaluate
 
-**MPJPE**
-```shell
-python -m eval.eval_humanml --model_path ./save/humanml_trans_enc_512/model000475000.pt
-```
-
 <details>
-  <summary><b>Text to Motion</b></summary>
+  <summary><b>Accuracy Study (MPJPE)</b></summary>
 
-* Takes about 20 hours (on a single GPU)
-* The output of this script for the pre-trained models (as was reported in the paper) is provided in the checkpoints zip file.
+* Takes about 30mins (on a single GPU) for 3 repetitions per input to go over the entire test set (excluding motion sequences shorter than 3s).
+* The output of this script will be printed in the terminal and correspond to the MPJPE at various time steps of the predicted motion (from 0.5 to 5.5s).
+* The pre-trained model results should match the ones reported in the temporal chart of the paper (or sometimes lower).
 
-**HumanML3D**
 ```shell
-python -m eval.eval_humanml --model_path ./save/humanml_trans_enc_512/model000475000.pt
+python -m eval.eval_mpjpe --model_path ./save/mdmp_pretrained/model000500000.pt --num_repetitions 3
 ```
 
-**KIT**
-```shell
-python -m eval.eval_humanml --model_path ./save/kit_trans_enc_512/model000400000.pt
-```
+**You may also define:**
+* `--device` id.
+* `--num_samples` to generate more samples conditionned on different inputs
+* `--num_repetitions` to generate more samples conditionned on the same inputs
+* `--model_path` to change the path if you have trained your own model and want to test it
+
+The chart in the paper:
+<img src="assets/temporal_chart.png" alt="Temporal Chart" width="400">:
+
 </details>
 
 <details>
-  <summary><b>Action to Motion</b></summary>
+  <summary><b>Uncertainty Study (Sparsification Error)</b></summary>
 
-* Takes about 7 hours for UESTC and 2 hours for HumanAct12 (on a single GPU)
-* The output of this script for the pre-trained models (as was reported in the paper) is provided in the checkpoints zip file.
-
-```shell
-python -m eval.eval_humanact12_uestc --model <path-to-model-ckpt> --eval_mode full
-```
-where `path-to-model-ckpt` can be a path to any of the pretrained action-to-motion models listed above, or to a checkpoint trained by the user.
-
-</details>
-
-
-<details>
-  <summary><b>Unconstrained</b></summary>
-
-* Takes about 3 hours (on a single GPU)
+* The output of this script will be saved in the folder and correspond to the Sparsification Plot.
+* The pre-trained model results should approxiametly match the ones reported in the paper (or sometimes lower).
 
 ```shell
-python -m eval.eval_humanact12_uestc --model ./save/unconstrained/model000450000.pt --eval_mode full
+python -m eval.eval_spars --model_path ./save/mdmp_pretrained/model000500000.pt --num_samples 10 --num_repetitions 5
 ```
 
-Precision and recall are not computed to save computing time. If you wish to compute them, edit the file eval/a2m/gru_eval.py and change the string `fast=True` to `fast=False`.
+**You may also define:**
+* `--device` id.
+* `--num_samples` to generate more samples conditionned on different inputs
+* `--num_repetitions` to generate more samples conditionned on the same inputs (usually results in a curve that aligns even closely to the Oracle)
+* `--model_path` to change the path if you have trained your own model and want to test it
+
+The plot in the paper: (here we only assess 'Mode Divergence' which is the best index)
+<img src="assets/sparsification.png" alt="Temporal Chart" width="400">:
 
 </details>
 

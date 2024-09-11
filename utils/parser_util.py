@@ -1,3 +1,4 @@
+# This code is modified from https://github.com/GuyTevet/motion-diffusion-model
 """
 This script is a utility for parsing and loading all the arguments of the model.
 """
@@ -88,8 +89,8 @@ def add_diffusion_options(parser):
 
 def add_model_options(parser):
     group = parser.add_argument_group('model')
-    group.add_argument("--use_gcn", default=False, type=bool)
-    group.add_argument("--emb_motion_len", default=0, type=int)
+    group.add_argument("--use_gcn", default=True, type=bool)
+    group.add_argument("--emb_motion_len", default=50, type=int)
     group.add_argument("--layers", default=8, type=int,
                        help="Number of layers.")
     group.add_argument("--latent_dim", default=512, type=int,
@@ -146,7 +147,7 @@ def add_training_options(parser):
                        help="Limit for the maximal number of frames. In HumanML3D and KIT this field is ignored.")
     group.add_argument("--resume_checkpoint", default="", type=str,
                        help="If not empty, will start from the specified checkpoint (path to model###.pt file).")
-    group.add_argument("--tensorboard_log_dir", default="./logs/multim_learnvar_motioninput50_50t_joints_model3", type=str,
+    group.add_argument("--tensorboard_log_dir", default="./logs/my_own_mdmp", type=str,
                        help="Directory where to store TensorBoard logs.")
 
 
