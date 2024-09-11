@@ -680,7 +680,7 @@ class GaussianDiffusion:
         :return: a non-differentiable batch of samples.
         """
         final = None
-        means = []
+        # means = []
         if dump_steps is not None:
             dump = []
 
@@ -708,13 +708,14 @@ class GaussianDiffusion:
                 dump.append(deepcopy(sample["sample"]))
             final = sample
             # if i >= 30 and i % 2 == 0: # track the mean of the last 20 steps of every 2nd diffusion step from 30 to 50
-            means.append(sample["sample"].detach().cpu())
+            # means.append(sample["sample"].detach().cpu())
         if dump_steps is not None:
             return dump
         if self.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
-            means = torch.stack(means, dim=0)  # Shape: [10, bs, 263, 1, 196]
-            mean_fluctuations = compute_cumulative_variance(means)
-            return final["sample"], final["log_variance"], mean_fluctuations
+            # means = torch.stack(means, dim=0)  # Shape: [10, bs, 263, 1, 196]
+            # mean_fluctuations = compute_cumulative_variance(means)
+            # return final["sample"], final["log_variance"], mean_fluctuations
+            return final["sample"], final["log_variance"]
         else:
             return final["sample"]
 

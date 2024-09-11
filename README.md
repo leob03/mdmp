@@ -1,88 +1,45 @@
-# MDMP: Multimodal Diffusion for Motion Predictions 
+# MDMP: Multi-modal Diffusion for supervised Motion Predictions 
 
-## Getting started
+## 🛠️ Getting Started
 
-This code was tested on `Ubuntu 18.04.5 LTS` and requires:
+<details>
 
-* Python 3.7
-* conda3 or miniconda3
-* CUDA capable GPU (one is enough)
-
-### 1. Setup environment
-
-Install ffmpeg (if not already installed):
+### 1. Setup Conda environment
 
 ```shell
 sudo apt update
 sudo apt install ffmpeg
-```
-For windows use [this](https://www.geeksforgeeks.org/how-to-install-ffmpeg-on-windows/) instead.
-
-Setup conda env:
-```shell
 conda env create -f environment.yml
 conda activate mdmp
 python -m spacy download en_core_web_sm
 pip install git+https://github.com/openai/CLIP.git
 ```
+We test our code on Python 3.7.13 and PyTorch 1.7.1
 
-Download dependencies:
-
+#### Alternative: Pip Installation
 <details>
-  <summary><b>Text to Motion</b></summary>
+We provide an alternative pip installation in case you encounter difficulties setting up the conda environment.
+
+```
+pip install -r requirements.txt
+```
+We test this installation on Python 3.10
+
+</details>
+
+### 2. Download dependencies:
 
 ```bash
 bash prepare/download_smpl_files.sh
 bash prepare/download_glove.sh
 bash prepare/download_t2m_evaluators.sh
-```
-</details>
-
-<details>
-  <summary><b>Action to Motion</b></summary>
-
-```bash
-bash prepare/download_smpl_files.sh
 bash prepare/download_recognition_models.sh
 ```
-</details>
 
-<details>
-  <summary><b>Unconstrained</b></summary>
+#### Troubleshooting
+To address the download error related to gdown: "Cannot retrieve the public link of the file. You may need to change the permission to 'Anyone with the link', or have had many accesses". A potential solution is to run `pip install --upgrade --no-cache-dir gdown`
 
-```bash
-bash prepare/download_smpl_files.sh
-bash prepare/download_recognition_models.sh
-bash prepare/download_recognition_unconstrained_models.sh
-```
-</details>
-
-### 2. Get data
-
-<details>
-  <summary><b>Text to Motion</b></summary>
-
-There are two paths to get the data:
-
-(a) **Go the easy way if** you just want to generate text-to-motion (excluding editing which does require motion capture data)
-
-(b) **Get full data** to train and evaluate the model.
-
-
-#### a. The easy way (text only)
-
-**HumanML3D** - Clone HumanML3D, then copy the data dir to our repository:
-
-```shell
-cd ..
-git clone https://github.com/EricGuo5513/HumanML3D.git
-unzip ./HumanML3D/HumanML3D/texts.zip -d ./HumanML3D/HumanML3D/
-cp -r HumanML3D/HumanML3D motion-diffusion-model/dataset/HumanML3D
-cd motion-diffusion-model
-```
-
-
-#### b. Full data (text + motion capture)
+### 3. Get data
 
 **HumanML3D** - Follow the instructions in [HumanML3D](https://github.com/EricGuo5513/HumanML3D.git),
 then copy the result dataset to our repository:
@@ -91,33 +48,11 @@ then copy the result dataset to our repository:
 cp -r ../HumanML3D/HumanML3D ./dataset/HumanML3D
 ```
 
-**KIT** - Download from [HumanML3D](https://github.com/EricGuo5513/HumanML3D.git) (no processing needed this time) and the place result in `./dataset/KIT-ML`
-</details>
+<!-- **KIT** - Download from [HumanML3D](https://github.com/EricGuo5513/HumanML3D.git) (no processing needed this time) and the place result in `./dataset/KIT-ML` -->
 
-<details>
-  <summary><b>Action to Motion</b></summary>
-
-**UESTC, HumanAct12** 
-```bash
-bash prepare/download_a2m_datasets.sh
-```
-</details>
-
-<details>
-  <summary><b>Unconstrained</b></summary>
-
-**HumanAct12** 
-```bash
-bash prepare/download_unconstrained_datasets.sh
-```
-</details>
-
-### 3. Download the pretrained models
+### 4. Download the pretrained models
 
 Download the model(s) you wish to use, then unzip and place them in `./save/`. 
-
-<details>
-  <summary><b>Text to Motion</b></summary>
 
 **You need only the first one.** 
 
@@ -125,48 +60,14 @@ Download the model(s) you wish to use, then unzip and place them in `./save/`.
 
 [humanml-encoder-512-50steps](https://drive.google.com/file/d/1cfadR1eZ116TIdXK7qDX1RugAerEiJXr/view?usp=sharing) - Runs 20X faster with comparable performance!
 
-[humanml-encoder-512](https://drive.google.com/file/d/1PE0PK8e5a5j-7-Xhs5YET5U5pGh0c821/view?usp=sharing) (best model used in the paper)
-
-[humanml-decoder-512](https://drive.google.com/file/d/1q3soLadvVh7kJuJPd2cegMNY2xVuVudj/view?usp=sharing)
-
-[humanml-decoder-with-emb-512](https://drive.google.com/file/d/1GnsW0K3UjuOkNkAWmjrGIUmeDDZrmPE5/view?usp=sharing)
-
-**KIT**
-
-[kit-encoder-512](https://drive.google.com/file/d/1SHCRcE0es31vkJMLGf9dyLe7YsWj7pNL/view?usp=sharing)
-
-</details>
-
-<details>
-  <summary><b>Action to Motion</b></summary>
-
-**UESTC**
-
-[uestc](https://drive.google.com/file/d/1goB2DJK4B-fLu2QmqGWKAqWGMTAO6wQ6/view?usp=sharing)
-
-[uestc_no_fc](https://drive.google.com/file/d/1fpv3mR-qP9CYCsi9CrQhFqlLavcSQky6/view?usp=sharing)
-
-**HumanAct12**
-
-[humanact12](https://drive.google.com/file/d/154X8_Lgpec6Xj0glEGql7FVKqPYCdBFO/view?usp=sharing)
-
-[humanact12_no_fc](https://drive.google.com/file/d/1frKVMBYNiN5Mlq7zsnhDBzs9vGJvFeiQ/view?usp=sharing)
-
-</details>
-
-<details>
-  <summary><b>Unconstrained</b></summary>
-
-**HumanAct12**
-
-[humanact12_unconstrained](https://drive.google.com/file/d/1uG68m200pZK3pD-zTmPXu5XkgNpx_mEx/view?usp=share_link)
 
 </details>
 
 
-## Motion Synthesis
+## 👁️ Visuals
+
 <details>
-  <summary><b>Text to Motion</b></summary>
+  <summary><b>Demo with Skeletons</b></summary>
 
 ### Generate from test set prompts
 
@@ -193,7 +94,7 @@ python -m sample.generate --model_path ./save/humanml_trans_enc_512/model0002000
 </details>
 
 <details>
-  <summary><b>Action to Motion</b></summary>
+  <summary><b>Demo with Skeletons & Presence zones</b></summary>
 
 ### Generate from test set actions
 
@@ -215,7 +116,7 @@ python -m sample.generate --model_path ./save/humanact12/model000350000.pt --act
 </details>
 
 <details>
-  <summary><b>Unconstrained</b></summary>
+  <summary><b>Demo with Human Meshes (Requires Blender)</b></summary>
 
 ```shell
 python -m sample.generate --model_path ./save/unconstrained/model000450000.pt --num_samples 10 --num_repetitions 3
@@ -390,3 +291,13 @@ python -m eval.eval_humanact12_uestc --model ./save/unconstrained/model000450000
 Precision and recall are not computed to save computing time. If you wish to compute them, edit the file eval/a2m/gru_eval.py and change the string `fast=True` to `fast=False`.
 
 </details>
+
+## Acknowledgments
+
+Thanks to Thanks to [guided-diffusion](https://github.com/openai/guided-diffusion), [MDM](https://github.com/GuyTevet/motion-diffusion-model), [TEMOS](https://github.com/Mathux/TEMOS), [ACTOR](https://github.com/Mathux/ACTOR), [HumanML3D](https://github.com/EricGuo5513/HumanML3D), [text-to-motion](https://github.com/EricGuo5513/text-to-motion), and [joints2smpl](https://github.com/wangsen1312/joints2smpl), our code is partially borrowing from them.
+
+## License
+
+This code is distributed under an [MIT LICENSE](LICENSE).
+
+Note that our code depends on other libraries, including CLIP, SMPL, SMPL-X, PyTorch3D, and uses datasets which each have their own respective licenses that must also be followed.

@@ -132,5 +132,5 @@ dataset/HumanAct12
 dataset/HumanML3D
 dataset/uestc
 logs/
-sub_modules/CLIP
+sub_modules/
 .vscode/

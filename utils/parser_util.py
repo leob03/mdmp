@@ -7,7 +7,16 @@ import argparse
 import os
 import json
 
-
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+    
 def parse_and_load_from_model(parser):
     # args according to the loaded model
     # do not try to specify them from cmd line since they will be overwritten
@@ -61,11 +70,11 @@ def get_model_path_from_args():
 
 def add_base_options(parser):
     group = parser.add_argument_group('base')
-    group.add_argument("--cuda", default=True, type=bool, help="Use cuda device, otherwise use CPU.")
+    group.add_argument("--cuda", default=True, type=str2bool, help="Use cuda device, otherwise use CPU.")
     group.add_argument("--device", default=0, type=int, help="Device id to use.")
     group.add_argument("--seed", default=10, type=int, help="For fixing random seed.")
     group.add_argument("--batch_size", default=64, type=int, help="Batch size during training.")
-    group.add_argument("--learning_var", default=False, type=bool, help="If True, will learn the variance during the diffusion process.")
+    group.add_argument("--learning_var", default=False, type=str2bool, help="If True, will learn the variance during the diffusion process.")
 
 
 def add_diffusion_options(parser):
@@ -226,7 +235,6 @@ def train_args():
 
 def generate_args():
     parser = ArgumentParser()
-    # args specified by the user: (all other will be loaded from the model)
     add_base_options(parser)
     add_sampling_options(parser)
     add_generate_options(parser)

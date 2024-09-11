@@ -289,23 +289,20 @@ def main():
     # Compute AUSE for uncertainty_particle
     per_joint_errors_all = torch.cat(per_joint_errors_all, dim=0)  # [num_samples*num_repetitions, 196*22]
 
-    if args.learning_var:
-        uncertainty_particle_ause = uncertainty_particle.mean(dim=1) # [num_repetitions*num_samples, seqlen, njoints]
-        sparsification_errors_up, oracle, sparsification_levels_up = calculate_ause(per_joint_errors_all, uncertainty_particle_ause, model_kwargs['y']['lengths'])
-        plt.figure(figsize=(10, 6))
-        plt.plot(sparsification_levels_lg, sparsification_errors_lg, marker='o', linestyle='-', color='b', label='Predicted Variance')
-        plt.plot(sparsification_levels_mf, sparsification_errors_mf, marker='s', linestyle=':', color='b', label='Denoising Fluctuations')
-        plt.plot(sparsification_levels_up, sparsification_errors_up, marker='s', linestyle='--', color='b', label='Mode Divergence')
-        plt.plot(sparsification_levels_up, oracle, marker='s', linestyle='--', color='g', label='Oracle')
-        plt.xlabel('Sparsification Level (Fraction of Data Removed)')
-        plt.ylabel('Sparsification Error')
-        plt.title('Sparsification Error vs. Sparsification Level')
-        plt.legend()
-        plt.grid(True)
-        plt.savefig('sparsification_error_plot_uncertainty_particle.png')
-        plt.close()
-
-    exit()
+    uncertainty_particle_ause = uncertainty_particle.mean(dim=1) # [num_repetitions*num_samples, seqlen, njoints]
+    sparsification_errors_up, oracle, sparsification_levels_up = calculate_ause(per_joint_errors_all, uncertainty_particle_ause, model_kwargs['y']['lengths'])
+    plt.figure(figsize=(10, 6))
+    # plt.plot(sparsification_levels_lg, sparsification_errors_lg, marker='o', linestyle='-', color='b', label='Predicted Variance')
+    # plt.plot(sparsification_levels_mf, sparsification_errors_mf, marker='s', linestyle=':', color='b', label='Denoising Fluctuations')
+    plt.plot(sparsification_levels_up, sparsification_errors_up, marker='s', linestyle='--', color='b', label='Mode Divergence')
+    plt.plot(sparsification_levels_up, oracle, marker='s', linestyle='--', color='g', label='Oracle')
+    plt.xlabel('Sparsification Level (Fraction of Data Removed)')
+    plt.ylabel('Sparsification Error')
+    plt.title('Sparsification Error vs. Sparsification Level')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig('sparsification_error_plot_uncertainty_particle.png')
+    plt.close()
     
     all_text = all_text[:total_num_samples]
     all_lengths = np.concatenate(all_lengths, axis=0)[:total_num_samples]
@@ -314,21 +311,21 @@ def main():
         all_variances = all_variances[:total_num_samples] # [num_samples*num_repetitions, 1, seqlen, njoints]
         all_mean_fluctuations = np.concatenate(all_mean_fluctuations, axis=0)
         all_mean_fluctuations = all_mean_fluctuations[:total_num_samples] # [num_samples*num_repetitions, 1, seqlen, njoints]
-        all_uncertainty_particle = uncertainty_particle.cpu().numpy()
+    all_uncertainty_particle = uncertainty_particle.cpu().numpy()
     if os.path.exists(out_path):
         shutil.rmtree(out_path)
     os.makedirs(out_path)
 
     npy_path = os.path.join(out_path, 'results.npy')
     print(f"saving results file to [{npy_path}]")
-    if args.learning_var:
-        np.save(npy_path,
-            {'motion': all_motions, 'variances': all_uncertainty_particle, 'text': all_text, 'lengths': all_lengths,
-             'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
-    else:
-        np.save(npy_path,
-            {'motion': all_motions, 'text': all_text, 'lengths': all_lengths,
-             'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
+    # if args.learning_var:
+    np.save(npy_path,
+        {'motion': all_motions, 'variances': all_uncertainty_particle, 'text': all_text, 'lengths': all_lengths,
+            'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
+    # else:
+    #     np.save(npy_path,
+    #         {'motion': all_motions, 'text': all_text, 'lengths': all_lengths,
+    #          'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
     with open(npy_path.replace('.npy', '.txt'), 'w') as fw:
         fw.write('\n'.join(all_text))
     with open(npy_path.replace('.npy', '_len.txt'), 'w') as fw:
@@ -357,7 +354,7 @@ def main():
                 # Apply smoothing to mean_fluctuation over time
                 window_size = 3  # Adjust this value to control the amount of smoothing
                 mean_fluctuation = all_mean_fluctuations[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length] # [seqlen, njoints-1, 3]
-                particle_uncertainty = all_uncertainty_particle[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length] # [seqlen, njoints, 3]
+            particle_uncertainty = all_uncertainty_particle[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length] # [seqlen, njoints, 3]
                 # mean_fluctuation_smoothed = np.zeros_like(mean_fluctuation)
                 # for i in range(mean_fluctuation.shape[0]):  # Iterate over joints
                 #     for j in range(mean_fluctuation.shape[1]):  # Iterate over dimensions
@@ -369,11 +366,11 @@ def main():
             animation_save_path = os.path.join(out_path, save_file)
             # plot_3d_motion(animation_save_path, skeleton, motion, variance=variance, dataset=args.dataset, title=caption, fps=fps) #modified plot_3d_motion to include variance
             assert motion.shape[0] == input_motion_reshaped.shape[0], f"Frame mismatch: joints has {motion.shape[0]} frames, gt_data has {input_motions_reshaped.shape[0]} frames."
-            if args.learning_var:
+            # if args.learning_var:
                 # plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, variance=variance, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
-                plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, variance=particle_uncertainty, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
-            else:
-                plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
+            plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, variance=particle_uncertainty, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
+            # else:
+            #     plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
 
             
             rep_files.append(animation_save_path)

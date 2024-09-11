@@ -14,7 +14,7 @@ class MDMP(nn.Module):
     def __init__(self, modeltype, njoints, nfeats, num_actions, translation, pose_rep, glob, glob_rot,
                  latent_dim=256, ff_size=1024, num_layers=8, num_heads=4, dropout=0.1,
                  ablation=None, activation="gelu", legacy=False, data_rep='rot6d', dataset='amass', clip_dim=512,
-                 use_gcn=True, clip_version=None, learning_var=True, **kargs):
+                 use_gcn=True, clip_version=None, learning_var=False, **kargs):
         super().__init__()
 
         self.legacy = legacy
