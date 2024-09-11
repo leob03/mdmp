@@ -116,6 +116,8 @@ It should look something like this:
 <details>
   <summary><b>Demo with SMPL Meshes (with Blender)</b></summary>
 
+### Generate simple skeleton videos to be rendered
+
 ```shell
 python -m sample.generate_for_meshes --model_path ./save/mdmp_pretrained/model000500000.pt --num_samples 3 --num_repetitions 3
 ```
@@ -134,6 +136,8 @@ It should look something like this:
 
 ![example](assets/example3.gif)
 
+### Create SMPL parameters
+
 Frow now on if you want to render the SMPL mesh you should chose an `.mp4` file that you would like to render, copy its relative path and use the following script to create SMPL parameters of that file:
 
 ```shell
@@ -144,9 +148,30 @@ python -m visualize.render_mesh --input_path /path/to/mp4/stick/figure/file
 * `sample##_rep##_smpl_params.npy` - SMPL parameters (thetas, root translations, vertices and faces)
 * `sample##_rep##_obj` - Mesh per frame in `.obj` format.
 
+### Set up blender - WIP
+
+Refer to [TEMOS-Rendering motions](https://github.com/Mathux/TEMOS) for blender setup, then install the following dependencies.
+
+```
+YOUR_BLENDER_PYTHON_PATH/python -m pip install -r prepare/blender_requirements.txt
+```
+
+### Render SMPL meshes
+
+Run the following command to render SMPL using blender:
+
+```
+YOUR_BLENDER_PATH/blender --background --python render.py -- --cfg=./configs/render.yaml --dir=YOUR_NPY_FOLDER --mode=video
+```
+
+optional parameters:
+
+- `--mode=video`: render mp4 video
+- `--mode=sequence`: render the whole motion in a png image.
+
 </details>
 
-## Train your own MDMP
+## 🚀 Train your own MDMP
 
 <details>
 
@@ -163,7 +188,9 @@ python -m train.train_mdmp --save_dir save/my_own_mdmp --dataset humanml
 * Add `--num_steps` to specificy the number of training steps and train more or less
 * Use `--batch_size` to change to a smaller batch size if your GPU memory gets in the way
 
-## Evaluate
+</details>
+
+## 📊 Evaluate
 
 <details>
   <summary><b>Accuracy Study (MPJPE)</b></summary>

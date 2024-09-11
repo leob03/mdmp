@@ -38,7 +38,7 @@ dependencies:
   - idna=3.4=pyhd8ed1ab_0
   - intel-openmp=2021.4.0=h06a4308_3561
   - jinja2=3.1.2=pyhd8ed1ab_1
-  - joblib=1.1.0=pyhd3eb1b0_0
+  - joblib=1.2.0
   - jpeg=9b=h024ee3a_2
   - kiwisolver=1.4.2=py37h295c915_0
   - langcodes=3.3.0=pyhd8ed1ab_0
@@ -68,8 +68,8 @@ dependencies:
   - ncurses=6.3=h5eee18b_3
   - ninja=1.10.2=h06a4308_5
   - ninja-base=1.10.2=hd09550d_5
-  - numpy=1.21.5=py37h6c91a56_3
-  - numpy-base=1.21.5=py37ha15fc14_3
+  - numpy=1.23.5=py37h6c91a56_3
+  - numpy-base=1.23.5=py37ha15fc14_3
   - openssl=1.1.1q=h7f8727e_0
   - packaging=21.3=pyhd8ed1ab_0
   - pathy=0.6.2=pyhd8ed1ab_0
@@ -133,4 +133,3 @@ dependencies:
     - urllib3==1.26.12
     - wasabi==0.10.1
     - wcwidth==0.2.5
-# prefix: /disk2/guytevet/anaconda3/envs/mdmp-venv
