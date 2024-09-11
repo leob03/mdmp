@@ -52,14 +52,13 @@ cp -r ../HumanML3D/HumanML3D ./dataset/HumanML3D
 
 ### 4. Download the pretrained models
 
-Download the model(s) you wish to use, then unzip and place them in `./save/`. 
+```
+bash prepare/download_models.sh
+```
 
-**You need only the first one.** 
+#### (Optional) Download Manually
 
-**HumanML3D**
-
-[humanml-encoder-512-50steps](https://drive.google.com/file/d/1cfadR1eZ116TIdXK7qDX1RugAerEiJXr/view?usp=sharing) - Runs 20X faster with comparable performance!
-
+[mdmp_pretrained](https://leobringer.com/wp-content/uploads/2024/09/preatrained_model.zip) - it's a zip file, unzip and place them in `./save/`.
 
 </details>
 

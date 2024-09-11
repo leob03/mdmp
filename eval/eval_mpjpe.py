@@ -81,10 +81,11 @@ def main():
     all_lengths = []
     all_text = []
 
-    start_idx = args.emb_motion_len
+    start_idx = args.emb_motion_len # 50 in most of our experiments
+    start_time_ms = start_idx / 20
 
-    times_ms = [0, 0.5, 1, 1.5, 2, 2.45, 2.95, 3.45, 3.95, 4.45, 4.95, 5.45, 5.95, 6.45, 6.95, 7.45, 7.95]  # in seconds
-    frame_indices = [int(20 * t) for t in times_ms] #[0, 10, 20, 30, 40, 49, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160]
+    times_ms = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8]  # in seconds
+    frame_indices = [int(20 * t) for t in times_ms] # [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160]
     mpjpe_specific_times = [[] for _ in times_ms]  # List to store MPJPE at specific times
 
     for idx, batch in enumerate(tqdm(subset_data_loader, desc="Sampling batches")):
@@ -195,7 +196,11 @@ def main():
                 if valid_mask_at_frame.any().item():  
                     mpjpe_at_time = overtime_3d_err[frame_idx]
                     mpjpe_specific_times[t_idx].append(mpjpe_at_time.item())
-                    print(f'Batch {idx} - Repetition {rep_i} - Time {times_ms[t_idx]}s - MPJPE: {mpjpe_at_time*1000:.4f}')
+                    adju_time = times_ms[t_idx] - start_time_ms
+                    if times_ms[t_idx] <= start_time_ms:
+                        continue
+                    else:
+                        print(f'Batch {idx} - Repetition {rep_i} - Time {adju_time}s - MPJPE: {mpjpe_at_time*1000:.4f}')
 
             if args.unconstrained:
                 all_text += ['unconstrained'] * args.batch_size
@@ -211,9 +216,12 @@ def main():
         # print(f"created {len(all_motions) * args.batch_size} samples")
 
     for time_ms, errors_at_time in zip(times_ms, mpjpe_specific_times):
+        if time_ms <= start_time_ms:
+            continue
         if errors_at_time:
             avg_error = sum(errors_at_time) / len(errors_at_time)
-            print(f'---> MPJPE at {time_ms} s = {avg_error*1000:.4f}')
+            adj_time = time_ms - start_time_ms
+            print(f'---> MPJPE at {adj_time} s = {avg_error*1000:.4f}')
 
 
 if __name__ == "__main__":

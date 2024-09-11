@@ -131,6 +131,7 @@ def main():
     per_joint_errors_all = []
 
     start_idx = args.emb_motion_len
+    start_time_ms = start_idx / 20
 
     # # For motion editing
     # model_kwargs['y']['inpainted_motion'] = input_motions
@@ -140,8 +141,8 @@ def main():
     # for i, length in enumerate(model_kwargs['y']['lengths'].cpu().numpy()):
     #     model_kwargs['y']['inpainting_mask'][i, :, :, 50:] = False  # do inpainting in those frames
 
-    times_ms = [0, 0.5, 1, 1.5, 2, 2.45, 2.95, 3.45, 3.95, 4.45, 4.95, 5.45, 5.95, 6.45, 6.95, 7.45, 7.95]
-    frame_indices = [int(20 * t) for t in times_ms]
+    times_ms = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8]  # in seconds
+    frame_indices = [int(20 * t) for t in times_ms] # [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160]
     mpjpe_specific_times = [[] for _ in times_ms]  # List to store MPJPE at specific times
 
 
@@ -241,9 +242,12 @@ def main():
     # print(f'---> Overall MPJPE = {mpjpe*1000:.4f}')
     # print(times_ms)
     for time_ms, errors_at_time in zip(times_ms, mpjpe_specific_times):
+        if time_ms <= start_time_ms:
+            continue
         if errors_at_time:
             avg_error = sum(errors_at_time) / len(errors_at_time)
-            print(f'---> MPJPE at {time_ms} s = {avg_error*1000:.4f}')
+            adj_time = time_ms - start_time_ms
+            print(f'---> MPJPE at {adj_time} s = {avg_error*1000:.4f}')
     
     all_motions = np.concatenate(all_motions, axis=0) # [num_samples*num_repetitions, njoints, 3, seqlen]
     # all_motions = all_motions[:total_num_samples]  # [num_samples*num_repetitions, njoints, 3, seqlen]
