@@ -1,7 +1,6 @@
-# This code is based on https://github.com/openai/guided-diffusion
+# This code is adapted from https://github.com/openai/guided-diffusion
 """
-Generate a large batch of image samples from a model and save them as a large
-numpy array. This can be used to produce samples for FID evaluation.
+Generate a large batch of motion samples to visualize and compare with the input motion (ground-truth) and the presence zones.
 """
 from utils.fixseed import fixseed
 import os
@@ -26,6 +25,8 @@ import matplotlib.pyplot as plt
 def main():
     args = generate_args()
     print(f'Args: %s' % args)
+    if args.num_repetitions <3:
+        raise ValueError('Please set num_repetitions >= 3, we need it for the uncertainty estimation.')
     fixseed(args.seed)
     out_path = args.output_dir
     name = os.path.basename(os.path.dirname(args.model_path))
@@ -37,7 +38,7 @@ def main():
     dist_util.setup_dist(args.device)
     if out_path == '':
         out_path = os.path.join(os.path.dirname(args.model_path),
-                                'samples_{}_{}_seed{}'.format(name, niter, args.seed))
+                                'samples_{}'.format(name))
         if args.text_prompt != '':
             out_path += '_' + args.text_prompt.replace(' ', '_').replace('.', '')
         elif args.input_text != '':
@@ -83,7 +84,7 @@ def main():
     # Use the subset data loader
     print("Extracting sequences from the end of the dataset...")
     total_samples = len(data.dataset)
-    start_index = total_samples - 2300
+    start_index = total_samples - 2310
     subset_indices = list(range(start_index, total_samples))
     subset_dataset = torch.utils.data.Subset(data.dataset, subset_indices)
     subset_data_loader = torch.utils.data.DataLoader(subset_dataset, 
@@ -159,7 +160,7 @@ def main():
         model_kwargs['y']['motion_embed_mask'][:, :, :, start_idx:] = False
         sample_fn = diffusion.p_sample_loop
 
-        if args.learning_var:
+        if args.lv:
             sample, log_variance, mean_fluctuations = sample_fn(
                 model,
                 (args.batch_size, model.njoints, model.nfeats, max_frames),
@@ -195,7 +196,7 @@ def main():
             sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
             sample = recover_from_ric(sample, n_joints) # [bs, 1, 196, 22, 3]
             sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1) # [bs, 22, 3, 196]
-            if args.learning_var:
+            if args.lv:
                 log_variance = data.dataset.t2m_dataset.inv_transform(log_variance.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
                 uncertainty_factor = compute_uncertainty_factor(log_variance, n_joints) # [bs, 22, 196]
 
@@ -242,7 +243,7 @@ def main():
                     # print(f'Repetition {rep_i} - Time {times_ms[t_idx]}s - MPJPE: {mpjpe_at_time*1000:.4f}')
 
         # Compute AUSE
-        if args.learning_var:
+        if args.lv:
             uncertainty_factor_ause = uncertainty_factor.squeeze(1)
             uncertainty_factor1_ause = uncertainty_factor_1.squeeze(1)
             sparsification_errors_lg, oracle, sparsification_levels_lg = calculate_ause(per_joint_errors, uncertainty_factor_ause, model_kwargs['y']['lengths'])
@@ -256,7 +257,7 @@ def main():
 
         all_motions.append(sample.cpu().numpy())
         all_lengths.append(model_kwargs['y']['lengths'].cpu().numpy())
-        if args.learning_var:
+        if args.lv:
             all_variances.append(uncertainty_factor.cpu().numpy())
             all_mean_fluctuations.append(uncertainty_factor_1.cpu().numpy())
         # print(f"created {len(all_motions) * args.batch_size} samples")
@@ -306,7 +307,7 @@ def main():
     
     all_text = all_text[:total_num_samples]
     all_lengths = np.concatenate(all_lengths, axis=0)[:total_num_samples]
-    if args.learning_var:
+    if args.lv:
         all_variances = np.concatenate(all_variances, axis=0)
         all_variances = all_variances[:total_num_samples] # [num_samples*num_repetitions, 1, seqlen, njoints]
         all_mean_fluctuations = np.concatenate(all_mean_fluctuations, axis=0)
@@ -316,16 +317,14 @@ def main():
         shutil.rmtree(out_path)
     os.makedirs(out_path)
 
+    print("\n" * 1)
+    print("Visuals with presence zones take a while to generate. Please be patient...")
+    print("\n" * 1)
+
     npy_path = os.path.join(out_path, 'results.npy')
-    print(f"saving results file to [{npy_path}]")
-    # if args.learning_var:
     np.save(npy_path,
         {'motion': all_motions, 'variances': all_uncertainty_particle, 'text': all_text, 'lengths': all_lengths,
             'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
-    # else:
-    #     np.save(npy_path,
-    #         {'motion': all_motions, 'text': all_text, 'lengths': all_lengths,
-    #          'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
     with open(npy_path.replace('.npy', '.txt'), 'w') as fw:
         fw.write('\n'.join(all_text))
     with open(npy_path.replace('.npy', '_len.txt'), 'w') as fw:
@@ -348,30 +347,25 @@ def main():
             motion = all_motions[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
             input_motions_reshaped_np = input_motions_reshaped.cpu().detach().numpy()  # if needed
             input_motion_reshaped = input_motions_reshaped_np[sample_i].transpose(2, 0, 1)[:length]
-            # print(f"motion shape: {motion.shape}") (196, 22, 3)
-            if args.learning_var:
+            if args.lv:
                 variance = all_variances[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]  # [njoints, 1, seqlen]
-                # Apply smoothing to mean_fluctuation over time
                 window_size = 3  # Adjust this value to control the amount of smoothing
                 mean_fluctuation = all_mean_fluctuations[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length] # [seqlen, njoints-1, 3]
-            particle_uncertainty = all_uncertainty_particle[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length] # [seqlen, njoints, 3]
                 # mean_fluctuation_smoothed = np.zeros_like(mean_fluctuation)
                 # for i in range(mean_fluctuation.shape[0]):  # Iterate over joints
                 #     for j in range(mean_fluctuation.shape[1]):  # Iterate over dimensions
                 #         mean_fluctuation_smoothed[i, j, :] = np.convolve(mean_fluctuation[i, j, :], np.ones(window_size)/window_size, mode='same')
                 # mean_fluctuation = mean_fluctuation_smoothed
+            particle_uncertainty = all_uncertainty_particle[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length] # [seqlen, njoints, 3]
 
             save_file = sample_file_template.format(sample_i, rep_i)
             print(sample_print_template.format(caption, sample_i, rep_i, save_file))
             animation_save_path = os.path.join(out_path, save_file)
-            # plot_3d_motion(animation_save_path, skeleton, motion, variance=variance, dataset=args.dataset, title=caption, fps=fps) #modified plot_3d_motion to include variance
+
             assert motion.shape[0] == input_motion_reshaped.shape[0], f"Frame mismatch: joints has {motion.shape[0]} frames, gt_data has {input_motions_reshaped.shape[0]} frames."
-            # if args.learning_var:
+            # if args.lv:
                 # plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, variance=variance, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
             plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, variance=particle_uncertainty, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
-            # else:
-            #     plot_3d_motion_with_gt(animation_save_path, skeleton, motion, dataset=args.dataset, gt_data=input_motion_reshaped, title=caption, fps=fps, emb_motion_len=args.emb_motion_len) #modified plot_3d_motion to include gt input motions
-
             
             rep_files.append(animation_save_path)
 
@@ -425,18 +419,6 @@ def construct_template_variables(unconstrained):
 
     return sample_print_template, row_print_template, all_print_template, \
            sample_file_template, row_file_template, all_file_template
-
-
-def load_dataset(args, max_frames, n_frames):
-    # print(args.dataset)
-    data = get_dataset_loader(name=args.dataset,
-                              batch_size=args.batch_size,
-                              num_frames=max_frames,
-                              split='test',
-                              hml_mode='text_only')
-    if args.dataset in ['kit', 'humanml']:
-        data.dataset.t2m_dataset.fixed_length = n_frames
-    return data
 
 
 if __name__ == "__main__":

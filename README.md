@@ -72,59 +72,49 @@ Download the model(s) you wish to use, then unzip and place them in `./save/`.
 ### Generate from test set prompts
 
 ```shell
-python -m sample.generate --model_path ./save/humanml_trans_enc_512/model000200000.pt --num_samples 10 --num_repetitions 3
+python -m sample.generate_w_gt --model_path ./save/mdmp_pretrained/model000500000.pt --num_samples 3 --num_repetitions 3
 ```
 
-```shell
-python -m sample.generate_w_motion_input --model_path ./save/multim_learnvar_motioninput50_50t_model3/model000600000.pt --num_samples 50 --num_repetitions 10
-```
-to add zones of presence with varying confidence levels: --learning_var True
+**You may modify the arguments based on your preferences:**
+* `--device` id. 
+* `--seed` to sample different prompts.
+* `--num_samples` to generate more samples conditionned on different inputs
+* `--num_repetitions` to generate more samples conditionned on the same inputs
 
-### Generate from your text file
+**Running those will get you:**
+* `results.npy` file with text prompts and xyz positions of the generated animation
+* `sample##_rep##.mp4` - a stick figure animation for each generated motion including the ground-truth motion for comparison.
 
-```shell
-python -m sample.generate --model_path ./save/humanml_trans_enc_512/model000200000.pt --input_text ./assets/example_text_prompts.txt
-```
+It will look something like this:
 
-### Generate a single prompt
+![example](assets/example_stick_fig.gif)
 
-```shell
-python -m sample.generate --model_path ./save/humanml_trans_enc_512/model000200000.pt --text_prompt "the person walked forward and is picking up his toolbox."
-```
 </details>
 
 <details>
   <summary><b>Demo with Skeletons & Presence zones</b></summary>
 
-### Generate from test set actions
-
 ```shell
-python -m sample.generate --model_path ./save/humanact12/model000350000.pt --num_samples 10 --num_repetitions 3
+python -m sample.generate_w_zones --model_path ./save/mdmp_pretrained/model000500000.pt --num_samples 3 --num_repetitions 3
 ```
 
-### Generate from your actions file
+**You may modify the arguments based on your preferences:**
+* `--device` id. 
+* `--seed` to sample different prompts.
+* `--num_samples` to generate more samples conditionned on different inputs
+* `--num_repetitions` to generate more samples conditionned on the same inputs
 
-```shell
-python -m sample.generate --model_path ./save/humanact12/model000350000.pt --action_file ./assets/example_action_names_humanact12.txt
-```
-
-### Generate a single action
-
-```shell
-python -m sample.generate --model_path ./save/humanact12/model000350000.pt --action_name "drink"
-```
+**Running those will get you:**
+* `results.npy` file with text prompts and xyz positions of the generated animation
+* `sample##_rep##.mp4` - a stick figure animation for each generated motion including zones of presence around 'end-effector' joints to assess uncertainty.
 </details>
 
 <details>
   <summary><b>Demo with Human Meshes (Requires Blender)</b></summary>
 
 ```shell
-python -m sample.generate --model_path ./save/unconstrained/model000450000.pt --num_samples 10 --num_repetitions 3
+python -m sample.generate_for_meshes --model_path ./save/mdmp_pretrained/model000500000.pt --num_samples 3 --num_repetitions 3
 ```
-
-By abuse of notation, (num_samples * num_repetitions) samples are created, and are visually organized in a display of num_samples rows and num_repetitions columns.
-
-</details>
 
 **You may also define:**
 * `--device` id.
@@ -132,13 +122,10 @@ By abuse of notation, (num_samples * num_repetitions) samples are created, and a
 * `--motion_length` (text-to-motion only) in seconds (maximum is 9.8[sec]).
 
 **Running those will get you:**
-
 * `results.npy` file with text prompts and xyz positions of the generated animation
-* `sample##_rep##.mp4` - a stick figure animation for each generated motion.
+* `sample##_rep##.mp4` - a stick figure animation for each generated motion with no ground-truth, no floor, nor zones of presence.
 
-It will look something like this:
-
-![example](assets/example_stick_fig.gif)
+</details>
 
 You can stop here, or render the SMPL mesh using the following script.
 
@@ -239,7 +226,6 @@ python -m train.train_mdmp --save_dir save/my_name --dataset humanact12 --cond_m
 * Add `--eval_during_training` to run a short (90 minutes) evaluation for each saved checkpoint. 
   This will slow down training but will give you better monitoring.
 * Add `--use_gcn=True` to try the GCN version
-* Add `--learning_var=True` to learn the variance during the diffusion denoising process
 
 ## Evaluate
 

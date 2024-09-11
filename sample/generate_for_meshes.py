@@ -84,7 +84,8 @@ def main():
 
     if is_using_data:
         iterator = iter(data)
-        _, model_kwargs = next(iterator)
+        input_motions, model_kwargs = next(iterator)
+        input_motions = input_motions.to(dist_util.dev())
     else:
         collate_args = [{'inp': torch.zeros(n_frames), 'tokens': None, 'lengths': n_frames}] * args.num_samples
         is_t2m = any([args.input_text, args.text_prompt])
@@ -99,7 +100,6 @@ def main():
         _, model_kwargs = collate(collate_args)
 
     all_motions = []
-    all_variances = []
     all_lengths = []
     all_text = []
 
@@ -110,13 +110,17 @@ def main():
         if args.guidance_param != 1:
             model_kwargs['y']['scale'] = torch.ones(args.batch_size, device=dist_util.dev()) * args.guidance_param
 
+        start_idx = 50
+        model_kwargs['y']['motion_embed'] = input_motions
+        model_kwargs['y']['motion_embed_mask'] = torch.ones_like(input_motions, dtype=torch.bool, device=input_motions.device)
+        model_kwargs['y']['motion_embed_mask'][:, :, :, start_idx:] = False
+
         sample_fn = diffusion.p_sample_loop
 
         if args.lv:
-            sample, log_variance = sample_fn(
+            sample, log_variance, mean_fluctuations = sample_fn(
                 model,
-                # (args.batch_size, model.njoints, model.nfeats, n_frames),  # BUG FIX - this one caused a mismatch between training and inference
-                (args.batch_size, model.njoints, model.nfeats, max_frames),  # BUG FIX
+                (args.batch_size, model.njoints, model.nfeats, max_frames),
                 clip_denoised=False,
                 model_kwargs=model_kwargs,
                 skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
@@ -129,8 +133,7 @@ def main():
         else:
             sample = sample_fn(
                 model,
-                # (args.batch_size, model.njoints, model.nfeats, n_frames),  # BUG FIX - this one caused a mismatch between training and inference
-                (args.batch_size, model.njoints, model.nfeats, max_frames),  # BUG FIX
+                (args.batch_size, model.njoints, model.nfeats, max_frames),
                 clip_denoised=False,
                 model_kwargs=model_kwargs,
                 skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
@@ -139,30 +142,20 @@ def main():
                 dump_steps=None,
                 noise=None,
                 const_noise=False,
-            )
+            )   
 
-        # print(f"sample shape: {sample.shape}") # [10, 263, 1, 196]
-        # print(f"log_variance shape: {log_variance.shape}") # [10, 263, 1, 196]
         # Recover XYZ *positions* from HumanML3D vector representation
         if model.data_rep == 'hml_vec':
             n_joints = 22 if sample.shape[1] == 263 else 21
             sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float()
             sample = recover_from_ric(sample, n_joints)
             sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1)
-            if args.lv:
-                log_variance = data.dataset.t2m_dataset.inv_transform(log_variance.cpu().permute(0, 2, 3, 1)).float()
-                log_variance = recover_from_ric(log_variance, n_joints)
-                log_variance = log_variance.view(-1, *log_variance.shape[2:]).permute(0, 2, 3, 1)
 
         rot2xyz_pose_rep = 'xyz' if model.data_rep in ['xyz', 'hml_vec'] else model.data_rep
         rot2xyz_mask = None if rot2xyz_pose_rep == 'xyz' else model_kwargs['y']['mask'].reshape(args.batch_size, n_frames).bool()
         sample = model.rot2xyz(x=sample, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
                                jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
                                get_rotations_back=False)
-        if args.lv:
-            log_variance = model.rot2xyz(x=log_variance, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
-                                        jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
-                                        get_rotations_back=False)
 
         if args.unconstrained:
             all_text += ['unconstrained'] * args.num_samples
@@ -172,8 +165,6 @@ def main():
 
         all_motions.append(sample.cpu().numpy())
         all_lengths.append(model_kwargs['y']['lengths'].cpu().numpy())
-        if args.lv:
-            all_variances.append(log_variance.cpu().numpy())
 
         print(f"created {len(all_motions) * args.batch_size} samples")
 
@@ -182,9 +173,6 @@ def main():
     all_motions = all_motions[:total_num_samples]  # [bs, njoints, 6, seqlen]
     all_text = all_text[:total_num_samples]
     all_lengths = np.concatenate(all_lengths, axis=0)[:total_num_samples]
-    if args.lv:
-        all_variances = np.concatenate(all_variances, axis=0)
-        all_variances = all_variances[:total_num_samples]
 
     if os.path.exists(out_path):
         shutil.rmtree(out_path)
@@ -192,12 +180,7 @@ def main():
 
     npy_path = os.path.join(out_path, 'results.npy')
     print(f"saving results file to [{npy_path}]")
-    if args.lv:
-        np.save(npy_path,
-            {'motion': all_motions, 'variances': all_variances, 'text': all_text, 'lengths': all_lengths,
-             'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
-    else:
-        np.save(npy_path,
+    np.save(npy_path,
             {'motion': all_motions, 'text': all_text, 'lengths': all_lengths,
              'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
     with open(npy_path.replace('.npy', '.txt'), 'w') as fw:
@@ -220,16 +203,11 @@ def main():
             caption = all_text[rep_i*args.batch_size + sample_i]
             length = all_lengths[rep_i*args.batch_size + sample_i]
             motion = all_motions[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
-            if args.lv:
-                variance = all_variances[rep_i*args.batch_size + sample_i].transpose(2, 0, 1)[:length]
             save_file = sample_file_template.format(sample_i, rep_i)
             print(sample_print_template.format(caption, sample_i, rep_i, save_file))
             animation_save_path = os.path.join(out_path, save_file)
-            if args.lv:
-                plot_3d_motion(animation_save_path, skeleton, motion, variance=variance, dataset=args.dataset, title=caption, fps=fps) #modified plot_3d_motion to include variance
-            else:
-                plot_3d_motion(animation_save_path, skeleton, motion, dataset=args.dataset, title=caption, fps=fps)
-
+            plot_3d_motion(animation_save_path, skeleton, motion, dataset=args.dataset, title=caption, fps=fps)
+            # Credit for visualization: https://github.com/EricGuo5513/text-to-motion
             rep_files.append(animation_save_path)
 
         sample_files = save_multiple_samples(args, out_path,
@@ -285,12 +263,11 @@ def construct_template_variables(unconstrained):
 
 
 def load_dataset(args, max_frames, n_frames):
-    # print(args.dataset)
     data = get_dataset_loader(name=args.dataset,
                               batch_size=args.batch_size,
                               num_frames=max_frames,
                               split='test',
-                              hml_mode='text_only')
+                              hml_mode='eval')
     if args.dataset in ['kit', 'humanml']:
         data.dataset.t2m_dataset.fixed_length = n_frames
     return data

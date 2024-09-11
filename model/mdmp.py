@@ -14,7 +14,7 @@ class MDMP(nn.Module):
     def __init__(self, modeltype, njoints, nfeats, num_actions, translation, pose_rep, glob, glob_rot,
                  latent_dim=256, ff_size=1024, num_layers=8, num_heads=4, dropout=0.1,
                  ablation=None, activation="gelu", legacy=False, data_rep='rot6d', dataset='amass', clip_dim=512,
-                 use_gcn=True, clip_version=None, learning_var=False, **kargs):
+                 use_gcn=True, clip_version=None, lv=False, **kargs):
         super().__init__()
 
         self.legacy = legacy
@@ -24,7 +24,7 @@ class MDMP(nn.Module):
         self.num_actions = num_actions
         self.data_rep = data_rep
         self.dataset = dataset
-        self.learning_var = learning_var
+        self.lv = lv
 
         self.pose_rep = pose_rep
         self.glob = glob
@@ -84,10 +84,10 @@ class MDMP(nn.Module):
 
         if not self.use_gcn:
             self.output_process = OutputProcess(self.data_rep, self.input_feats, self.latent_dim, self.njoints,
-                                            self.nfeats, self.learning_var)
+                                            self.nfeats, self.lv)
         else:
             self.output_process = OutputProcess_wGCN(self.data_rep, self.input_feats, self.latent_dim, self.njoints,
-                                            self.nfeats, self.learning_var)
+                                            self.nfeats, self.lv)
 
         self.rot2xyz = Rotation2xyz(device='cpu', dataset=self.dataset)
 
@@ -272,15 +272,15 @@ class InputProcess_wGCN(nn.Module):
 
 
 class OutputProcess(nn.Module):
-    def __init__(self, data_rep, input_feats, latent_dim, njoints, nfeats, learning_var):
+    def __init__(self, data_rep, input_feats, latent_dim, njoints, nfeats, lv):
         super().__init__()
         self.data_rep = data_rep
         self.input_feats = input_feats
         self.latent_dim = latent_dim
         self.njoints = njoints
         self.nfeats = nfeats
-        self.learning_var = learning_var
-        if self.learning_var:
+        self.lv = lv
+        if self.lv:
             self.poseFinal = nn.Linear(self.latent_dim, self.input_feats * 2) # Updated
         else:
             self.poseFinal = nn.Linear(self.latent_dim, self.input_feats)
@@ -299,7 +299,7 @@ class OutputProcess(nn.Module):
             output = torch.cat((first_pose, vel), axis=0)
         else:
             raise ValueError
-        if self.learning_var:
+        if self.lv:
             output = output.reshape(nframes, bs, 2 * self.input_feats, self.nfeats)  # Updated
         else:
             output = output.reshape(nframes, bs, self.input_feats, self.nfeats)
@@ -307,16 +307,16 @@ class OutputProcess(nn.Module):
         return output
 
 class OutputProcess_wGCN(nn.Module):
-    def __init__(self, data_rep, input_feats, latent_dim, njoints, nfeats, learning_var):
+    def __init__(self, data_rep, input_feats, latent_dim, njoints, nfeats, lv):
         super().__init__()
         self.data_rep = data_rep
         self.input_feats = input_feats
         self.latent_dim = latent_dim
         self.njoints = njoints
         self.nfeats = nfeats
-        self.learning_var = learning_var
+        self.lv = lv
         # Update: Output layer now has 2 * input_feats to include variance
-        if self.learning_var:
+        if self.lv:
             self.poseFinal = GraphConvolution(self.latent_dim, self.input_feats*2, node_n=196, bias=True)
         else:
             self.poseFinal = GraphConvolution(self.latent_dim, self.input_feats, node_n=196, bias=True)
@@ -339,7 +339,7 @@ class OutputProcess_wGCN(nn.Module):
         else:
             raise ValueError
         # Updated: Reshape to include doubled features for mean and variance
-        if self.learning_var:
+        if self.lv:
             # print('output shape', output.shape) # [seqlen, bs, 132]
             output = output.reshape(nframes, bs, 2 * self.input_feats, self.nfeats)  # Updated
         else:

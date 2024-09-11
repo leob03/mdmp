@@ -21,7 +21,7 @@ from tqdm import tqdm
 
 def main():
     args = generate_args()
-    print("args.learning_var: ", args.learning_var)
+    print("args.lv: ", args.lv)
     print(f'Args: %s' % args)
     fixseed(args.seed)
     out_path = args.output_dir
@@ -112,7 +112,7 @@ def main():
 
         for rep_i in range(args.num_repetitions):
             # print(f'### Sampling [repetitions #{rep_i}]')
-            if args.learning_var:
+            if args.lv:
                 sample, log_variance = sample_fn(
                     model,
                     (args.batch_size, model.njoints, model.nfeats, max_frames),
@@ -144,7 +144,7 @@ def main():
                 sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
                 sample = recover_from_ric(sample, n_joints) # [bs, 1, 196, 22, 3]
                 sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1) # [bs, 22, 3, 196]
-                if args.learning_var:
+                if args.lv:
                     log_variance = data.dataset.t2m_dataset.inv_transform(log_variance.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
                     log_variance = log_variance[..., 4:(n_joints - 1) * 3 + 4] # [bs, 1, 196, 63]
                     log_variance = log_variance.view(log_variance.shape[:-1] + (-1, 3)) # [bs, 1, 196, 21, 3]
@@ -162,7 +162,7 @@ def main():
                                 jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
                                 get_rotations_back=False) # [10, 22, 3, 196]
 
-            if args.learning_var:
+            if args.lv:
                 log_variance = model.rot2xyz(x=log_variance, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
                                             jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
                                             get_rotations_back=False)
@@ -205,7 +205,7 @@ def main():
 
             all_motions.append(sample.cpu().numpy())
             all_lengths.append(model_kwargs['y']['lengths'].cpu().numpy())
-            if args.learning_var:
+            if args.lv:
                 all_variances.append(log_variance.cpu().numpy())
 
         # print(f"created {len(all_motions) * args.batch_size} samples")

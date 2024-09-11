@@ -28,7 +28,7 @@ def main():
     args = generate_args()
     print(f'Args: %s' % args)
     fixseed(args.seed)
-    args.learning_var = True
+    args.lv = True
     out_path = args.output_dir
     name = os.path.basename(os.path.dirname(args.model_path))
     niter = os.path.basename(args.model_path).replace('model', '').replace('.pt', '')
@@ -121,7 +121,7 @@ def main():
 
         for rep_i in range(args.num_repetitions):
             # print(f'### Sampling [repetitions #{rep_i}]')
-            if args.learning_var:
+            if args.lv:
                 sample, log_variance, mean_fluctuations = sample_fn(
                     model,
                     (args.batch_size, model.njoints, model.nfeats, max_frames),
@@ -153,7 +153,7 @@ def main():
                 sample = data.dataset.t2m_dataset.inv_transform(sample.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
                 sample = recover_from_ric(sample, n_joints) # [bs, 1, 196, 22, 3]
                 sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1) # [bs, 22, 3, 196]
-                if args.learning_var:
+                if args.lv:
                     log_variance = data.dataset.t2m_dataset.inv_transform(log_variance.cpu().permute(0, 2, 3, 1)).float() # [bs, 1, 196, 263]
                     uncertainty_factor = compute_uncertainty_factor(log_variance, n_joints) # [bs, 22, 196]
 
@@ -200,7 +200,7 @@ def main():
                     mpjpe_specific_times[t_idx].append(mpjpe_at_time.item())
                     print(f'Batch {idx} - Repetition {rep_i} - Time {times_ms[t_idx]}s - MPJPE: {mpjpe_at_time*1000:.4f}')
 
-            # if args.learning_var:
+            # if args.lv:
             #     uncertainty_factor_ause = uncertainty_factor.squeeze(1) # [bs, 22, 196]
             #     uncertainty_factor1_ause = uncertainty_factor_1.squeeze(1) # [bs, 1, 196, 22]
             #     sparsification_errors_lg, oracle, sparsification_levels_lg = calculate_ause(per_joint_errors, uncertainty_factor_ause, model_kwargs['y']['lengths'])
@@ -213,7 +213,7 @@ def main():
                 all_text += model_kwargs['y'][text_key]
 
             all_motions.append(sample.cpu().numpy())
-            if args.learning_var:
+            if args.lv:
                 all_variances.append(uncertainty_factor.cpu().numpy())
                 all_mean_fluctuations.append(uncertainty_factor_1.cpu().numpy())
         

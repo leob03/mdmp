@@ -167,8 +167,8 @@ class CompMDMPGeneratedDataset(Dataset):
 
     def __init__(self, model, diffusion, dataloader, mm_num_samples, mm_num_repeats, max_motion_length, num_samples_limit, start_idx, scale=1.):
         self.dataloader = dataloader
-        # self.learn_var = diffusion.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]
-        self.learn_var = diffusion.model_var_type.value in [ModelVarType.LEARNED.value, ModelVarType.LEARNED_RANGE.value]
+        # self.lv = diffusion.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]
+        self.lv = diffusion.model_var_type.value in [ModelVarType.LEARNED.value, ModelVarType.LEARNED_RANGE.value]
         self.dataset = dataloader.dataset
         assert mm_num_samples < len(dataloader.dataset)
         use_ddim = False  # FIXME - hardcoded
@@ -217,7 +217,7 @@ class CompMDMPGeneratedDataset(Dataset):
                 mm_motions = []
                 for t in range(repeat_times):
 
-                    if self.learn_var:
+                    if self.lv:
                         sample, log_variance = sample_fn(
                             model=model,
                             shape=motion.shape,
@@ -247,7 +247,7 @@ class CompMDMPGeneratedDataset(Dataset):
                         )
 
                     if t == 0:
-                        if self.learn_var:
+                        if self.lv:
                             sub_dicts = [{
                             'input_motion': motion[bs_i].squeeze().permute(1, 0).cpu().numpy(),
                             'motion': sample[bs_i].squeeze().permute(1, 0).cpu().numpy(),
@@ -307,7 +307,7 @@ class CompMDMPGeneratedDataset(Dataset):
         # logging.debug("Data at index %d: %s", item, data)
 
         input_motion, motion, m_length, caption, tokens = data['input_motion'], data['motion'], data['length'], data['caption'], data['tokens']
-        if self.learn_var:
+        if self.lv:
             log_variance = data['log_variance']
             # logging.debug("Retrieved log_variance: %s", log_variance is not None)
         else:
@@ -344,7 +344,7 @@ class CompMDMPGeneratedDataset(Dataset):
         pos_one_hots = np.concatenate(pos_one_hots, axis=0)
         word_embeddings = np.concatenate(word_embeddings, axis=0)
 
-        if self.learn_var:
+        if self.lv:
             # logging.debug('Returning with log_variance')
             return word_embeddings, pos_one_hots, caption, sent_len, input_motion, motion, log_variance, m_length, '_'.join(tokens)
         else:
