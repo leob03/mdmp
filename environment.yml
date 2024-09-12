@@ -1,4 +1,4 @@
-name: mdmp
+name: mdmp_test
 channels:
   - pytorch
   - anaconda
@@ -68,8 +68,8 @@ dependencies:
   - ncurses=6.3=h5eee18b_3
   - ninja=1.10.2=h06a4308_5
   - ninja-base=1.10.2=hd09550d_5
-  - numpy=1.23.5=py37h6c91a56_3
-  - numpy-base=1.23.5=py37ha15fc14_3
+  - numpy=1.21.5=py37h6c91a56_3
+  - numpy-base=1.21.5=py37ha15fc14_3
   - openssl=1.1.1q=h7f8727e_0
   - packaging=21.3=pyhd8ed1ab_0
   - pathy=0.6.2=pyhd8ed1ab_0
@@ -137,7 +137,7 @@ dependencies:
     - moviepy
     - pyrender
     - scikit-image
-    - spacy
+    - spacy==3.3.1
     - imageio
     - wandb
     - einops
