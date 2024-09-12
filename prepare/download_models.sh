@@ -8,7 +8,7 @@ echo -e "Unzipping preatrained_model.zip"
 unzip preatrained_model.zip
 
 #Oupsi aha
-mv preatrainned_model pretrained_model
+mv save/preatrained_model save/pretrained_model
 
 echo -e "Cleaning preatrained_model.zip"
 rm preatrained_model.zip
