@@ -1,4 +1,4 @@
-name: mdmp_test
+name: mdmp
 channels:
   - pytorch
   - anaconda
