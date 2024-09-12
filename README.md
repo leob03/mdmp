@@ -140,7 +140,7 @@ python -m sample.generate_for_meshes --model_path ./save/mdmp_pretrained/model00
 It should look something like this:
 
 <div align="center">
-  <img src="assets/example3.gif" alt="example">
+  <img src="assets/example5.gif" alt="example">
 </div>
 
 ### Create SMPL parameters
@@ -179,7 +179,7 @@ YOUR_BLENDER_PATH/blender --background --python render.py -- --cfg=./configs/ren
 * `sample##_rep##_smpl_params.mp4` - a Video with the SMPL parameters rendered with Blender that should look like this:
 
 <div align="center">
-  <img src="assets/example3.gif" alt="example">
+  <img src="assets/example6.gif" alt="example">
 </div>
 
 * `sample##_rep##_smpl_params.png` - A summary of the sequence through an image that should look like this:
