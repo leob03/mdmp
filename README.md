@@ -188,7 +188,7 @@ YOUR_BLENDER_PATH/blender --background --python render.py -- --cfg=./configs/ren
   <img src="assets/example6.png" alt="example">
 </div>
 
-* It will also create folders with the `.obj` files 
+* It will also create one folder with the `.obj` files and one with each single frame of the video.
 
 
 </details>
