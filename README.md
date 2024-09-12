@@ -1,4 +1,4 @@
-# MDMP: Multi-modal Diffusion for supervised Motion Predictions 
+# Official repo for MDMP
 
 ## 🛠️ Getting Started
 
@@ -197,7 +197,6 @@ YOUR_BLENDER_PATH/blender --background --python render.py -- --cfg=./configs/ren
 
 <details>
 
-**HumanML3D**
 ```shell
 python -m train.train_mdmp --save_dir save/my_own_mdmp --dataset humanml
 ```

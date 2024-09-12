@@ -147,8 +147,8 @@ def plot_3d_motion(save_path, kinematic_tree, joints, title, dataset, variance =
     ani = FuncAnimation(fig, update, frames=frame_number, interval=1000 / fps, repeat=False)
 
     # writer = FFMpegFileWriter(fps=fps)
-    ani.save(save_path, fps=fps)
-    # ani = FuncAnimation(fig, update, frames=frame_number, interval=1000 / fps, repeat=False, init_func=init)
+    # ani.save(save_path, fps=fps)
+    ani = FuncAnimation(fig, update, frames=frame_number, interval=1000 / fps, repeat=False, init_func=init)
     # ani.save(save_path, writer='pillow', fps=1000 / fps)
 
     plt.close()
@@ -275,25 +275,14 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
             sphere = spheres.pop()
             sphere.remove()
 
-        # if variance is not None:
-        #     for joint_idx in specific_joints_indices:
-        #         joint_position = data[index, joint_idx+1]
-        #         # joint_variance = np.exp(0.5*np.mean(variance[index, joint_idx]))
-        #         joint_variance = np.exp(0.5*variance[joint_idx, 0, index])
-        #         joint_variance_exp = np.exp(joint_variance) * 0.47
-        #         # joint_variance_exp = np.exp(joint_variance) * 0.3
-        #         joint_variance_transformed = joint_variance_exp ** 8  # You can experiment with different powers or transformations
-        #         radius = joint_variance_transformed / 3
-        #         # radius = joint_variance / 3
-        #         sphere = draw_sphere(joint_position, radius, color='c', alpha=0.1)
-        #         spheres.append(sphere)
-
         if variance is not None:
             for joint_idx in specific_joints_indices:
                 joint_position = data[index, joint_idx]
-                # joint_variance = np.exp(0.5*np.mean(variance[index, joint_idx]))
+                # joint_variance = np.exp(0.5*np.mean(variance[joint_idx,:,index])) * 1000
                 # joint_variance = np.exp(0.5*variance[joint_idx, 0, index])
-                joint_variance = 10*np.mean(variance[joint_idx, :, index])
+                joint_variance = np.mean(variance[joint_idx, :, index]) * 0.05 #for learned variance
+                # joint_variance = np.mean(variance[joint_idx, :, index]) * 10 #for mode divergence
+                # joint_variance = np.mean(variance[joint_idx, :, index])     #for mean_fluctuation
                 radius = joint_variance / 3
                 sphere = draw_sphere(joint_position, radius, color='c', alpha=0.1)
                 spheres.append(sphere)
@@ -324,7 +313,7 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
 #         ax.set_xlim3d([-radius / 2, radius / 2])
 #         ax.set_ylim3d([0, radius])
 #         ax.set_zlim3d([-radius / 3., radius * 2 / 3.])
-#         fig.suptitle(title, fontsize=10)
+#         # fig.suptitle(title, fontsize=10)
 #         ax.grid(b=False)
 
 #     def plot_xzPlane(minx, maxx, miny, minz, maxz):
@@ -381,6 +370,15 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
 #     accumulated_lines_gt = []
 #     accumulated_lines_pred = []
 
+#     spheres = []
+
+#     def draw_sphere(position, radius, color='c', alpha=0.1):
+#         u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]
+#         x = radius * np.cos(u) * np.sin(v) + position[0]
+#         y = radius * np.sin(u) * np.sin(v) + position[1]
+#         z = radius * np.cos(v) + position[2]
+#         return ax.plot_surface(x, y, z, color=color, alpha=alpha)
+
 #     def update(index):
 #         if index in frames_to_accumulate:
 #             ax.view_init(elev=120, azim=-90)
@@ -399,8 +397,23 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
 #             ax.set_xticklabels([])
 #             ax.set_yticklabels([])
 #             ax.set_zticklabels([])
+#             while spheres:
+#                 sphere = spheres.pop()
+#                 sphere.remove()
 
-#     frames_to_accumulate = range(0, min(115, frame_number), 15)
+#             if variance is not None:
+#                 for joint_idx in specific_joints_indices:
+#                     joint_position = data[index, joint_idx]
+#                     # joint_variance = np.exp(0.5*np.mean(variance[joint_idx,:,index])) * 1000
+#                     # joint_variance = np.exp(0.5*variance[joint_idx, 0, index])
+#                     # joint_variance = np.mean(variance[joint_idx, :, index]) * 0.05 #for learned variance
+#                     # joint_variance = np.mean(variance[joint_idx, :, index]) * 10 #for mode divergence
+#                     joint_variance = np.mean(variance[joint_idx, :, index])     #for mean_fluctuation
+#                     radius = joint_variance / 3
+#                     sphere = draw_sphere(joint_position, radius, color='c', alpha=0.1)
+#                     spheres.append(sphere)
+
+#     frames_to_accumulate = range(0, min(115, frame_number), 10)
 #     ani = FuncAnimation(fig, update, frames=frames_to_accumulate, interval=1000 / fps, repeat=False)
 
 #     ani.save(save_path, fps=fps)
