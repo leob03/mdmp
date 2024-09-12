@@ -140,15 +140,15 @@ def plot_3d_motion(save_path, kinematic_tree, joints, title, dataset, variance =
             for joint_idx in specific_joints_indices:
                 joint_position = data[index, joint_idx]
                 # joint_variance = np.exp(np.mean(variance[index, joint_idx]))  # Convert log variance to actual variance
-                joint_variance = np.exp(np.mean(variance[index, joint_idx])) * 0.3
+                joint_variance = np.exp(np.mean(variance[index, joint_idx])) * 10
                 radius = np.sqrt(joint_variance) / 3  # Simplified radius calculation
                 draw_sphere(joint_position, radius, color='c', alpha=0.1)
 
     ani = FuncAnimation(fig, update, frames=frame_number, interval=1000 / fps, repeat=False)
 
     # writer = FFMpegFileWriter(fps=fps)
-    # ani.save(save_path, fps=fps)
-    ani = FuncAnimation(fig, update, frames=frame_number, interval=1000 / fps, repeat=False, init_func=init)
+    ani.save(save_path, fps=fps)
+    # ani = FuncAnimation(fig, update, frames=frame_number, interval=1000 / fps, repeat=False, init_func=init)
     # ani.save(save_path, writer='pillow', fps=1000 / fps)
 
     plt.close()
@@ -280,8 +280,8 @@ def plot_3d_motion_with_gt(save_path, kinematic_tree, joints, title, dataset, va
                 joint_position = data[index, joint_idx]
                 # joint_variance = np.exp(0.5*np.mean(variance[joint_idx,:,index])) * 1000
                 # joint_variance = np.exp(0.5*variance[joint_idx, 0, index])
-                joint_variance = np.mean(variance[joint_idx, :, index]) * 0.05 #for learned variance
-                # joint_variance = np.mean(variance[joint_idx, :, index]) * 10 #for mode divergence
+                # joint_variance = np.mean(variance[joint_idx, :, index]) * 0.05 #for learned variance
+                joint_variance = np.mean(variance[joint_idx, :, index]) * 10 #for mode divergence
                 # joint_variance = np.mean(variance[joint_idx, :, index])     #for mean_fluctuation
                 radius = joint_variance / 3
                 sphere = draw_sphere(joint_position, radius, color='c', alpha=0.1)
