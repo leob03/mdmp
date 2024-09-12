@@ -86,7 +86,9 @@ python -m sample.generate_w_gt --model_path ./save/mdmp_pretrained/model00050000
 
 It should look something like this:
 
-![example](assets/example1.gif)
+<div align="center">
+  <img src="assets/example1.gif" alt="example">
+</div>
 
 </details>
 
@@ -110,7 +112,10 @@ python -m sample.generate_w_zones --model_path ./save/mdmp_pretrained/model00050
 
 It should look something like this:
 
-![example](assets/example2.gif)
+<div align="center">
+  <img src="assets/example2.gif" alt="example">
+</div>
+
 </details>
 
 <details>
@@ -134,7 +139,9 @@ python -m sample.generate_for_meshes --model_path ./save/mdmp_pretrained/model00
 
 It should look something like this:
 
-![example](assets/example3.gif)
+<div align="center">
+  <img src="assets/example3.gif" alt="example">
+</div>
 
 ### Create SMPL parameters
 
@@ -148,7 +155,7 @@ python -m visualize.render_mesh --input_path /path/to/mp4/stick/figure/file
 * `sample##_rep##_smpl_params.npy` - SMPL parameters (thetas, root translations, vertices and faces)
 * `sample##_rep##_obj` - Mesh per frame in `.obj` format.
 
-### Set up blender - WIP
+### Set up blender
 
 Refer to [TEMOS-Rendering motions](https://github.com/Mathux/TEMOS) for blender setup, then install the following dependencies.
 
@@ -161,13 +168,28 @@ YOUR_BLENDER_PYTHON_PATH/python -m pip install -r prepare/blender_requirements.t
 Run the following command to render SMPL using blender:
 
 ```
-YOUR_BLENDER_PATH/blender --background --python render.py -- --cfg=./configs/render.yaml --dir=YOUR_NPY_FOLDER --mode=video
+YOUR_BLENDER_PATH/blender --background --python render.py -- --cfg=./configs/render.yaml --npy=YOUR_NPY_FOLDER --mode=video
 ```
 
-optional parameters:
-
+**You may also define:**
 - `--mode=video`: render mp4 video
 - `--mode=sequence`: render the whole motion in a png image.
+
+**Based on the mode you chose this script outputs:**
+* `sample##_rep##_smpl_params.mp4` - a Video with the SMPL parameters rendered with Blender that should look like this:
+
+<div align="center">
+  <img src="assets/example3.gif" alt="example">
+</div>
+
+* `sample##_rep##_smpl_params.png` - A summary of the sequence through an image that should look like this:
+
+<div align="center">
+  <img src="assets/example6.png" alt="example">
+</div>
+
+* It will also create folders with the `.obj` files 
+
 
 </details>
 

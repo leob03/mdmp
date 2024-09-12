@@ -133,3 +133,16 @@ dependencies:
     - urllib3==1.26.12
     - wasabi==0.10.1
     - wcwidth==0.2.5
+    - natsort
+    - moviepy
+    - pyrender
+    - scikit-image
+    - spacy
+    - imageio
+    - wandb
+    - einops
+    - chumpy
+    - rich
+    - omegaconf
+    - shortuuid
+    - h5py

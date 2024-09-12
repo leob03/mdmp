@@ -11,6 +11,7 @@ from utils.parser_util import generate_args
 from utils.model_util import create_model_and_diffusion, load_model_wo_clip
 from utils import dist_util
 from model.cfg_sampler import ClassifierFreeSampleModel
+from data_loaders.get_data import get_dataset_loader, get_collate_fn
 from data_loaders.get_data import get_dataset_loader
 from data_loaders.humanml.scripts.motion_process import recover_from_ric
 import data_loaders.humanml.utils.paramUtil as paramUtil
@@ -32,7 +33,7 @@ def main():
     dist_util.setup_dist(args.device)
     if out_path == '':
         out_path = os.path.join(os.path.dirname(args.model_path),
-                                'samples_{}_{}_seed{}'.format(name, niter, args.seed))
+                                'samples_{}'.format(name))
         if args.text_prompt != '':
             out_path += '_' + args.text_prompt.replace(' ', '_').replace('.', '')
         elif args.input_text != '':
@@ -67,8 +68,26 @@ def main():
     args.batch_size = args.num_samples  # Sampling a single batch from the testset, with exactly args.num_samples
 
     print('Loading dataset...')
-    data = load_dataset(args, max_frames, n_frames)
+    data = get_dataset_loader(name=args.dataset,
+                              batch_size=args.batch_size,
+                              num_frames=max_frames,
+                              split='test',
+                            #   hml_mode='train') # in train mode, you get both text and motion.
+                              hml_mode='eval')  
     total_num_samples = args.num_samples * args.num_repetitions
+
+    # Use the subset data loader
+    print("Extracting sequences from the end of the dataset...")
+    total_samples = len(data.dataset)
+    # start_index = total_samples - 1
+    start_index = total_samples - 2310    
+    subset_indices = list(range(start_index, total_samples))
+    subset_dataset = torch.utils.data.Subset(data.dataset, subset_indices)
+    subset_data_loader = torch.utils.data.DataLoader(subset_dataset, 
+                                                    batch_size=args.batch_size, 
+                                                    shuffle=False, 
+                                                    num_workers=8, 
+                                                    collate_fn=get_collate_fn(args.dataset, 'eval'))
 
     print("Creating model and diffusion...")
     model, diffusion = create_model_and_diffusion(args, data)
@@ -83,9 +102,12 @@ def main():
     model.eval()  # disable random masking
 
     if is_using_data:
-        iterator = iter(data)
+        iterator = iter(subset_data_loader) # for fixed long sequences to compare different models
+        # iterator = iter(data) #for random sequences from the evaluation part of the dataset
         input_motions, model_kwargs = next(iterator)
         input_motions = input_motions.to(dist_util.dev())
+        # print(model_kwargs['y']['text'])
+        # raise SystemExit
     else:
         collate_args = [{'inp': torch.zeros(n_frames), 'tokens': None, 'lengths': n_frames}] * args.num_samples
         is_t2m = any([args.input_text, args.text_prompt])
@@ -97,7 +119,8 @@ def main():
             action = data.dataset.action_name_to_action(action_text)
             collate_args = [dict(arg, action=one_action, action_text=one_action_text) for
                             arg, one_action, one_action_text in zip(collate_args, action, action_text)]
-        _, model_kwargs = collate(collate_args)
+        input_motions, model_kwargs = collate(collate_args)
+        input_motions = input_motions.to(dist_util.dev())
 
     all_motions = []
     all_lengths = []

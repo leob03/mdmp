@@ -39,7 +39,7 @@ def parse_args(self, args=None, namespace=None):
 setattr(ArgumentParser, 'parse_args_bak', ArgumentParser.parse_args)
 setattr(ArgumentParser, 'parse_args', parse_args)
 
-from mGPT.config import parse_args
+from render.config import parse_args
 
 
 def render_cli() -> None:
@@ -75,8 +75,8 @@ def render_cli() -> None:
 
     
 
-    from mGPT.render.blender import render
-    from mGPT.render.video import Video
+    from render.blender import render
+    from render.video import Video
 
     init = True
     for path in paths:
