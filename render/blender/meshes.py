@@ -42,7 +42,7 @@ class Meshes:
         # import sys
         # print(sys.path)
         import matplotlib
-        if frac < 0.25:
+        if frac < 0.40:
             cmap = matplotlib.cm.get_cmap('Blues')
         else:
             cmap = matplotlib.cm.get_cmap('Oranges')
