@@ -258,7 +258,7 @@ The plot in the paper: (here we only assess 'Mode Divergence' which is the best 
 
 ## Acknowledgments
 
-Thanks to Thanks to [guided-diffusion](https://github.com/openai/guided-diffusion), [MDM](https://github.com/GuyTevet/motion-diffusion-model), [TEMOS](https://github.com/Mathux/TEMOS), [ACTOR](https://github.com/Mathux/ACTOR), [HumanML3D](https://github.com/EricGuo5513/HumanML3D), [text-to-motion](https://github.com/EricGuo5513/text-to-motion), and [joints2smpl](https://github.com/wangsen1312/joints2smpl), our code is partially borrowing from them.
+Thanks to [guided-diffusion](https://github.com/openai/guided-diffusion), [MDM](https://github.com/GuyTevet/motion-diffusion-model), [TEMOS](https://github.com/Mathux/TEMOS), [ACTOR](https://github.com/Mathux/ACTOR), [HumanML3D](https://github.com/EricGuo5513/HumanML3D), [text-to-motion](https://github.com/EricGuo5513/text-to-motion), and [joints2smpl](https://github.com/wangsen1312/joints2smpl), our code is partially borrowing from them.
 
 ## License
 
