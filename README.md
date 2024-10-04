@@ -1,4 +1,16 @@
 # Official repo for MDMP
+<p align="center">
+  <img src="assets/short.gif" />
+</p>
+
+## :postbox: News
+
+📢 **2024-10-04** --- Now you can use MDMP in Blender as an add-on.
+
+📢 **2023-10-01** --- Release codes and models for MDMP. Including training/eval/generation scripts.
+
+📢 **2024-09-25** --- MDMP is on ArXiv.  
+
 
 ## 🛠️ Getting Started
 
