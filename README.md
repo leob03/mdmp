@@ -1,9 +1,13 @@
-# Official repo for MDMP
+<div align="center">
+
+# MDMP: Multi-modal Diffusion for supervised Motion Predictions
 
 ### [[Paper]](https://arxiv.org/abs/2410.03860)
 <p align="center">
   <img src="assets/short.gif" />
 </p>
+
+</div>
 
 If you find our code or paper helpful, please consider starring our repository and citing:
 ```
