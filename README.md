@@ -61,14 +61,13 @@ We test this installation on Python 3.10
 ### 2. Download dependencies:
 
 ```bash
+pip install --upgrade --no-cache-dir gdown
 bash prepare/download_smpl_files.sh
 bash prepare/download_glove.sh
 bash prepare/download_t2m_evaluators.sh
 bash prepare/download_recognition_models.sh
 ```
 
-#### Troubleshooting
-To address the download error related to gdown: "Cannot retrieve the public link of the file. You may need to change the permission to 'Anyone with the link', or have had many accesses". A potential solution is to run `pip install --upgrade --no-cache-dir gdown`
 
 ### 3. Get data
 
