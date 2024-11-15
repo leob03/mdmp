@@ -5,3 +5,5 @@ hydra-core
 six
 natsort
 moviepy
+smplx
+numpy==1.23
