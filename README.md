@@ -2,11 +2,33 @@
 
 # MDMP: Multi-modal Diffusion for supervised Motion Predictions
 
+### [[Paper]](https://arxiv.org/abs/2410.03860)
 <p align="center">
   <img src="assets/short.gif" />
 </p>
 
 </div>
+
+If you find our code or paper helpful, please consider starring our repository and citing:
+```
+@misc{bringer2024mdmp,
+      title={MDMP: Multi-modal Diffusion for supervised Motion Predictions with uncertainty}, 
+      author={Leo Bringer and Joey Wilson and Kira Barton and Maani Ghaffari},
+      year={2024},
+      eprint={2410.03860},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2410.03860}, 
+}
+```
+
+## :postbox: News
+
+📢 **2024-10-04** --- MDMP is on ArXiv. 
+
+📢 **2023-10-01** --- Now you can use MDMP in Blender as an add-on. 
+
+📢 **2024-09-25** --- Release codes and models for MDMP. Including training/eval/generation scripts.
 
 
 ## 🛠️ Getting Started
