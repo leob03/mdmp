@@ -2,11 +2,6 @@
 
 # MDMP: Multi-modal Diffusion for supervised Motion Predictions
 
-### [[Paper]](https://arxiv.org/abs/2410.03860)
-<p align="center">
-  <img src="assets/short.gif" />
-</p>
-
 </div>
 
 
