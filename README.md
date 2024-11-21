@@ -2,6 +2,10 @@
 
 # MDMP: Multi-modal Diffusion for supervised Motion Predictions
 
+<p align="center">
+  <img src="assets/short.gif" />
+</p>
+
 </div>
 
 
