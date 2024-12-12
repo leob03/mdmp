@@ -1,6 +1,6 @@
 <div align="center">
 
-# MDMP: Multi-modal Diffusion for supervised Motion Predictions
+# MDMP: Multi-modal Diffusion for supervised Motion Predictions with uncertainty
 
 ### [[Paper]](https://arxiv.org/abs/2410.03860)
 <p align="center">
