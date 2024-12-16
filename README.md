@@ -213,11 +213,11 @@ YOUR_BLENDER_PATH/blender --background --python render.py -- --cfg=./configs/ren
 </details>
 
 <div align="center">
-  <img src="assets/example6.gif" alt="example">
+  <img src="assets/example6.gif" alt="example" width="350">
 </div>
 
 <div align="center">
-  <img src="assets/example6.png" alt="example">
+  <img src="assets/example6.png" alt="example" width="500">
 </div>
 
 ## 🚀 Train your own MDMP
