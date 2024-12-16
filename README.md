@@ -22,6 +22,7 @@ If you find our code or paper helpful, please consider starring our repository a
 }
 ```
 
+<!--
 ## :postbox: News
 
 📢 **2024-10-04** --- MDMP is on ArXiv. 
@@ -29,6 +30,7 @@ If you find our code or paper helpful, please consider starring our repository a
 📢 **2023-10-01** --- Now you can use MDMP in Blender as an add-on. 
 
 📢 **2024-09-25** --- Release codes and models for MDMP. Including training/eval/generation scripts.
+-->
 
 
 ## 🛠️ Getting Started
@@ -116,11 +118,11 @@ python -m sample.generate_w_gt --model_path ./save/mdmp_pretrained/model00050000
 
 It should look something like this:
 
+</details>
+
 <div align="center">
   <img src="assets/example1.gif" alt="example">
 </div>
-
-</details>
 
 <details>
   <summary><b>Demo with Skeletons & Presence zones</b></summary>
@@ -142,11 +144,11 @@ python -m sample.generate_w_zones --model_path ./save/mdmp_pretrained/model00050
 
 It should look something like this:
 
+</details>
+
 <div align="center">
   <img src="assets/example2.gif" alt="example">
 </div>
-
-</details>
 
 <details>
   <summary><b>Demo with SMPL Meshes (with Blender)</b></summary>
@@ -206,22 +208,17 @@ YOUR_BLENDER_PATH/blender --background --python render.py -- --cfg=./configs/ren
 - `--mode=sequence`: render the whole motion in a png image.
 
 **Based on the mode you chose this script outputs:**
-* `sample##_rep##_smpl_params.mp4` - a Video with the SMPL parameters rendered with Blender that should look like this:
+* `sample##_rep##_smpl_params.mp4` or `sample##_rep##_smpl_params.png` - a Video with the SMPL parameters rendered with Blender (along with a folder with the `.obj` files associated to each single frame of the video) or an image summary of the sequence, which should look like this:
+
+</details>
 
 <div align="center">
   <img src="assets/example6.gif" alt="example">
 </div>
 
-* `sample##_rep##_smpl_params.png` - A summary of the sequence through an image that should look like this:
-
 <div align="center">
   <img src="assets/example6.png" alt="example">
 </div>
-
-* It will also create one folder with the `.obj` files and one with each single frame of the video.
-
-
-</details>
 
 ## 🚀 Train your own MDMP
 
