@@ -2,7 +2,7 @@
 
 # MDMP: Multi-modal Diffusion for supervised Motion Predictions with uncertainty
 
-### [[Paper]](https://arxiv.org/abs/2410.03860)
+### [[Paper]](https://arxiv.org/abs/2410.03860) [[Website Page]](https://leob03.github.io/mdmp.github.io/)
 <p align="center">
   <img src="assets/short.gif" />
 </p>
