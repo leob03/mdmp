@@ -4,7 +4,7 @@
 
 ### [[Paper]](https://arxiv.org/abs/2410.03860) [[Website Page]](https://leob03.github.io/mdmp.github.io/)
 <p align="center">
-  <img src="assets/short.gif" />
+  <img src="assets/summary.gif" />
 </p>
 
 </div>
